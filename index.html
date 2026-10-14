@@ -41,6 +41,7 @@ a{color:var(--me)}
 button.chip{cursor:pointer}
 .chip{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
 .iconbtn{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:var(--muted)}
+.iconbtn[hidden]{display:none}
 .iconbtn:active{background:var(--panel2)}
 .iconbtn svg{width:22px;height:22px}
 
@@ -142,6 +143,31 @@ button.chip{cursor:pointer}
 .small{font-size:13px;color:var(--dim)}
 .howto{font-size:14.5px;color:var(--muted)}
 .howto li{margin:4px 0}
+/* floating window over the meeting (laptop) */
+html.pip body{font-size:14px}
+html.pip .bar{padding:6px 10px;gap:6px}
+html.pip #statusText{font-size:13px}
+html.pip #timer{font-size:12px}
+html.pip .chip{font-size:10.5px;padding:3px 7px}
+html.pip .iconbtn{width:30px;height:30px}
+html.pip .iconbtn svg{width:18px;height:18px}
+html.pip .banner{margin:6px 8px 0;padding:8px 10px;font-size:13px}
+html.pip #cards{padding:8px 8px 10px}
+html.pip .card{padding:10px 12px 8px;border-radius:12px;margin-bottom:8px}
+html.pip .card-q{font-size:12.5px;margin-bottom:6px}
+html.pip .card-a{font-size:min(var(--fs),16px)}
+html.pip .card-a pre code{font-size:12.5px}
+html.pip .live-head{padding:5px 10px 0}
+html.pip #transcript{font-size:12.5px;padding:2px 10px 6px;max-height:4.2em}
+html.pip .live.expanded #transcript{max-height:55vh}
+html.pip .controls{padding:6px 6px 8px;gap:5px}
+html.pip .ctl{min-height:40px;font-size:11px;border-radius:10px;gap:1px}
+html.pip .ctl svg{width:17px;height:17px}
+html.pip .welcome h1{font-size:17px}
+html.pip .welcome p,html.pip .steps li{font-size:13px}
+html.pip #btnPop{display:none}
+.popped{display:flex;align-items:center;justify-content:center;height:100vh;padding:24px;text-align:center;color:var(--muted)}
+.popped h2{color:var(--text);margin:0 0 8px;font-size:20px}
 .toast{position:fixed;left:50%;bottom:calc(var(--safe-b) + 92px);transform:translateX(-50%);background:#24282f;border:1px solid var(--line);color:var(--text);padding:9px 14px;border-radius:10px;font-size:14px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
 .toast.show{opacity:1}
 .typebox{display:flex;gap:8px;margin-top:6px}
@@ -153,6 +179,9 @@ button.chip{cursor:pointer}
   <header class="bar">
     <div class="status"><span class="dot" id="dot"></span><span id="statusText">Ready</span><span id="timer"></span></div>
     <button class="chip" id="modeChip" title="Tap to switch mode">Interview</button>
+    <button class="iconbtn" id="btnPop" aria-label="Pop out" title="Float the copilot over your meeting" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><rect x="12" y="11" width="8" height="7" rx="1" fill="currentColor" stroke="none"/></svg>
+    </button>
     <button class="iconbtn" id="btnSettings" aria-label="Settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
     </button>
@@ -198,6 +227,10 @@ button.chip{cursor:pointer}
 
     <h3>Mode</h3>
     <div class="seg" id="segMode"><button data-v="interview">Interview</button><button data-v="meeting">Meeting</button></div>
+
+    <h3>Listen through</h3>
+    <div class="seg" id="segSrc"><button data-v="room">Phone near laptop</button><button data-v="tab">This computer</button></div>
+    <div class="help" id="srcHelp" style="font-size:13px;color:var(--dim);margin-top:6px">This computer: hears the meeting tab directly plus your mic. Headphones are fine. Chrome or Edge.</div>
 
     <h3>You</h3>
     <div class="field"><label for="fName">Your name</label><input id="fName" autocomplete="off" placeholder="e.g. Chitranshu"></div>
@@ -280,11 +313,12 @@ const store = {
   del(k) { try { localStorage.removeItem('cc.' + k); } catch (e) {} }
 };
 
-const DEFAULTS = { dgKey: '', anKey: '', mode: 'interview', name: '', about: '', call: '', terms: '', length: 'short', lang: 'en', model: 'claude-haiku-5-5', fs: 19, examples: 'on', codeNotes: 'on' };
+const DEFAULTS = { dgKey: '', anKey: '', mode: 'interview', name: '', about: '', call: '', terms: '', length: 'short', lang: 'en', model: 'claude-haiku-5-5', fs: 19, examples: 'on', codeNotes: 'on', source: '' };
 let S = Object.assign({}, DEFAULTS, store.get('settings', {}));
 
 /* ---------- dom ---------- */
-const $ = (s) => document.querySelector(s);
+let D = document; // the document the copilot currently lives in (main tab or floating window)
+const $ = (s) => D.querySelector(s) || document.querySelector(s);
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 const cardsEl = $('#cards'), trEl = $('#transcript');
 
@@ -323,6 +357,7 @@ function setStatus(text, state) {
 }
 function applyLook() {
   document.documentElement.style.setProperty('--fs', S.fs + 'px');
+  if (D !== document) D.documentElement.style.setProperty('--fs', S.fs + 'px');
   $('#modeChip').textContent = S.mode === 'meeting' ? 'Meeting' : 'Interview';
 }
 applyLook();
@@ -464,6 +499,16 @@ function toggleLine(turn) {
 }
 
 /* ---------- transcript ---------- */
+const normWord = (w) => String(w.word || w.punctuated_word || '').toLowerCase().replace(/[^a-z0-9']/g, '');
+const tabMode = () => S.source === 'tab';
+// share of these words that match words the meeting tab carried at nearly the same moment
+function echoShare(wt, them) {
+  const ws = wt.filter((x) => x.n);
+  if (ws.length < 2 || !them.length) return 0;
+  let hit = 0;
+  for (const x of ws) if (them.some((t) => t.n === x.n && Math.abs(t.s - x.s) < 1.5)) hit++;
+  return hit / ws.length;
+}
 function ingestFinal(conn, words) {
   // group consecutive words by speaker
   const runs = [];
@@ -477,8 +522,9 @@ function ingestFinal(conn, words) {
       s.sum += db; s.n++;
     }
     const r = runs[runs.length - 1];
-    if (r && r.spk === spk) { r.text += ' ' + txt; r.end = w.end; r.words.push(txt); }
-    else runs.push({ spk, text: txt, start: w.start, end: w.end, words: [txt] });
+    const wt = { n: normWord(w), s: w.start };
+    if (r && r.spk === spk) { r.text += ' ' + txt; r.end = w.end; r.words.push(txt); r.wt.push(wt); }
+    else runs.push({ spk, text: txt, start: w.start, end: w.end, words: [txt], wt: [wt] });
   }
   for (const r of runs) {
     // voice check: who says "testing"?
@@ -491,9 +537,9 @@ function ingestFinal(conn, words) {
     }
     const last = sess.turns[sess.turns.length - 1];
     if (last && last.conn === conn && last.spk === r.spk && r.start - last.end < 6) {
-      last.text += ' ' + r.text; last.end = r.end;
+      last.text += ' ' + r.text; last.end = r.end; if (last.wt) last.wt = last.wt.concat(r.wt).slice(-400);
     } else {
-      sess.turns.push({ id: nextId++, conn, spk: r.spk, text: r.text, start: r.start, end: r.end });
+      sess.turns.push({ id: nextId++, conn, spk: r.spk, text: r.text, start: r.start, end: r.end, wt: r.wt });
     }
   }
   if (sess.turns.length > 1500) sess.turns.splice(0, sess.turns.length - 1500);
@@ -543,7 +589,9 @@ $('#liveHead').onclick = () => { $('#live').classList.toggle('expanded'); trSig 
 /* ---------- question detection ---------- */
 const wc = (s) => (s.trim().match(/\S+/g) || []).length;
 let trigT = null;
-function scheduleAnswer(ms) { clearTimeout(trigT); trigT = setTimeout(() => maybeAnswer(false), ms); }
+let trigDue = 0;
+function scheduleAnswer(ms) { clearTimeout(trigT); trigDue = Date.now() + ms; trigT = setTimeout(fireAnswer, ms); }
+function fireAnswer() { if (!trigDue) return; trigDue = 0; clearTimeout(trigT); maybeAnswer(false); }
 
 // Latest block of THEM speech: skip trailing ME talk, then collect THEM turns
 // until a real ME turn (3+ words). Short "mm", "yeah" from ME do not split a question.
@@ -870,7 +918,12 @@ function welcomeEl() {
   w.appendChild(el('h1', '', 'Your live call copilot'));
   w.appendChild(el('p', '', 'It listens to the call, tells your voice from theirs, and puts an answer to each question on this screen.'));
   const ol = el('ol', 'steps');
-  const items = [
+  const items = tabMode() ? [
+    ['Add your two keys', ' and paste your background in Settings.'],
+    ['Open your meeting', ' (Google Meet, Teams or Zoom) in another Chrome tab.'],
+    ['Click Listen,', ' pick the meeting tab and tick "Also share tab audio". Allow the mic.'],
+    ['Click Pop out', ' to float this small window over your meeting.']
+  ] : [
     ['Add your two keys', ' and paste your background in Settings.'],
     ['Laptop audio on speakers', ', phone flat on the desk near the laptop.'],
     ['Tap Listen', ' and say "testing, testing" so it knows your voice.'],
@@ -882,6 +935,7 @@ function welcomeEl() {
   const s = el('button', 'btn' + (ready ? '' : ' primary'), ready ? 'Settings' : 'Open settings'); s.onclick = openSettings;
   const d = el('button', 'btn', 'Watch a demo'); d.onclick = startDemo;
   row.appendChild(s); row.appendChild(d);
+  if (window.documentPictureInPicture && D === document) { const po = el('button', 'btn', 'Pop out'); po.onclick = popOut; row.appendChild(po); }
   w.appendChild(row);
   return w;
 }
@@ -897,10 +951,12 @@ let samplesSent = 0;
 function dgUrl() {
   const p = new URLSearchParams({
     model: 'nova-3', language: S.lang === 'multi' ? 'multi' : 'en',
-    encoding: 'linear16', sample_rate: String(OUT_RATE), channels: '1',
+    encoding: 'linear16', sample_rate: String(OUT_RATE), channels: tabMode() ? '2' : '1',
     interim_results: 'true', utterance_end_ms: '1000', endpointing: '300',
-    smart_format: 'true', punctuate: 'true', diarize: 'true'
+    smart_format: 'true', punctuate: 'true'
   });
+  // on a computer: channel 0 is your mic (ME), channel 1 is the meeting tab (THEM), so no guessing who spoke
+  if (tabMode()) p.set('multichannel', 'true'); else p.set('diarize', 'true');
   if (S.lang !== 'multi') S.terms.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 40).forEach((k) => p.append('keyterm', k));
   return 'wss://api.deepgram.com/v1/listen?' + p.toString();
 }
@@ -916,13 +972,24 @@ function connectDG() {
   clearTimeout(reconnectT); reconnectT = null;
   const conn = ++sess.conn;
   sess.frames[conn] = []; samplesSent = 0; pending = [];
+  if (tabMode()) { sess.maps[conn] = { me: 0, src: 'channel' }; trVer++; }
+  sess.interimBy = {};
   let opened = false;
   try { ws = new WebSocket(dgUrl(), ['token', S.dgKey.trim()]); }
   catch (e) { ws = null; scheduleReconnect(); return; }
   ws.binaryType = 'arraybuffer';
   const me = ws;
+  // a connection that never opens (bad network, blocked site) must not hang on "Starting..."
+  const openTimer = setTimeout(() => {
+    if (me !== ws || opened) return;
+    ws = null; try { me.close(); } catch (e) {}
+    if (!sess.running) return;
+    if (!everConnected) fail('Could not reach Deepgram, the listening service. Check the internet connection and the Deepgram key in Settings, then tap Listen.');
+    else scheduleReconnect();
+  }, 9000);
   ws.onopen = () => {
     if (me !== ws) return;
+    clearTimeout(openTimer);
     opened = true; dgFails = 0;
     if (everConnected) banner('Back on. Everything said so far is kept. If ME / THEM look wrong, tap Swap.', '', 'OK');
     everConnected = true;
@@ -934,6 +1001,7 @@ function connectDG() {
   ws.onerror = () => {};
   ws.onclose = (ev) => {
     if (me !== ws) return;
+    clearTimeout(openTimer);
     ws = null;
     if (!sess.running) return;
     if (!opened && !everConnected) { fail('Deepgram refused the connection. Check the Deepgram key in Settings (and that it has credit).'); return; }
@@ -945,15 +1013,34 @@ function onDG(conn, m) {
   if (m.type === 'Results') {
     const alt = m.channel && m.channel.alternatives && m.channel.alternatives[0];
     if (!alt) return;
-    const words = alt.words || [];
+    let words = alt.words || [];
+    const multi = Array.isArray(m.channel_index) && m.channel_index[1] > 1;
+    const ch = multi ? m.channel_index[0] : null;
+    if (multi) words = words.map((w) => Object.assign({}, w, { speaker: ch }));
+    const ib = sess.interimBy || (sess.interimBy = {});
     if (!m.is_final) {
       if (alt.transcript) {
-        sess.interim = { conn, spk: words.length ? (words[0].speaker == null ? 0 : words[0].speaker) : null, text: alt.transcript };
+        const it = { conn, spk: words.length ? (words[0].speaker == null ? 0 : words[0].speaker) : ch, text: alt.transcript };
+        if (multi) { ib[ch] = it; sess.interim = ib[1] || ib[0]; } else sess.interim = it;
         renderTranscript();
       }
       return;
     }
-    sess.interim = null;
+    if (multi) { delete ib[ch]; sess.interim = ib[1] || ib[0] || null; } else sess.interim = null;
+    if (multi && words.length) {
+      // laptop speakers can leak the meeting into your mic: drop those copies
+      const rec = (sess.recent = sess.recent || {});
+      const rw = rec[conn] || (rec[conn] = { 0: [], 1: [] });
+      const wt = words.map((w) => ({ n: normWord(w), s: w.start }));
+      if (ch === 0 && echoShare(wt, rw[1]) >= 0.5) { rw[0] = rw[0].concat(wt).slice(-300); renderTranscript(); return; }
+      if (ch === 1) {
+        for (let i = sess.turns.length - 1, seen = 0; i >= 0 && seen < 6; i--, seen++) {
+          const t = sess.turns[i];
+          if (t.conn === conn && t.spk === 0 && t.wt && echoShare(t.wt, wt) >= 0.5) { sess.turns.splice(i, 1); trSig = ''; }
+        }
+      }
+      rw[ch] = rw[ch].concat(wt).slice(-300);
+    }
     if (words.length) ingestFinal(conn, words);
     if (finalWaiters.length) finalWaiters.splice(0).forEach((f) => f());
     if (nowBusy) { if (!words.length) renderTranscript(); return; } // Answer now is about to handle it
@@ -988,6 +1075,7 @@ function pushFrame(f) {
 let lastAudioAt = 0, healing = false, healTries = 0, watchI = null;
 function onAudio(input, inRate) {
   lastAudioAt = Date.now();
+  if (trigDue && lastAudioAt >= trigDue) fireAnswer();
   // resample to 16 kHz by block averaging
   const ratio = inRate / OUT_RATE;
   const buf = new Float32Array(carry.length + input.length);
@@ -1004,6 +1092,63 @@ function onAudio(input, inRate) {
     pos += ratio;
   }
   carry = buf.slice(Math.floor(pos));
+}
+
+let tabStream = null, carryR = new Float32Array(0), frame2 = new Int16Array(FRAME * 2), fill2 = 0;
+// two channels in, resampled to 16 kHz and interleaved: left = your mic, right = the meeting tab
+function onAudio2(L, R, inRate) {
+  lastAudioAt = Date.now();
+  if (trigDue && lastAudioAt >= trigDue) fireAnswer();
+  const ratio = inRate / OUT_RATE;
+  const bl = new Float32Array(carry.length + L.length); bl.set(carry); bl.set(L, carry.length);
+  const br = new Float32Array(carryR.length + R.length); br.set(carryR); br.set(R, carryR.length);
+  const len = Math.min(bl.length, br.length);
+  let pos = 0;
+  const avg = (buf, a, b) => { let s = 0, n = 0; for (let i = a; i < b; i++) { s += buf[i]; n++; } const v = Math.max(-1, Math.min(1, n ? s / n : buf[a])); return v < 0 ? v * 0x8000 : v * 0x7fff; };
+  while (pos + ratio <= len) {
+    const a = Math.floor(pos), b = Math.floor(pos + ratio);
+    frame2[fill2++] = avg(bl, a, b); frame2[fill2++] = avg(br, a, b);
+    if (fill2 === FRAME * 2) { pushFrame(frame2); frame2 = new Int16Array(FRAME * 2); fill2 = 0; }
+    pos += ratio;
+  }
+  carry = bl.slice(Math.floor(pos)); carryR = br.slice(Math.floor(pos));
+}
+async function startAudioTab() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  ctx = new AC();
+  const resumed = ctx.resume().catch(() => {});
+  // 1) the meeting tab's sound (THEM). Chrome asks which tab: pick the meeting and tick "Also share tab audio".
+  tabStream = await navigator.mediaDevices.getDisplayMedia({
+    video: { displaySurface: 'browser', frameRate: 1, width: 320, height: 180 },
+    audio: { suppressLocalAudioPlayback: false, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    selfBrowserSurface: 'exclude', surfaceSwitching: 'include', systemAudio: 'include', preferCurrentTab: false
+  });
+  if (!tabStream.getAudioTracks().length) { tabStream.getTracks().forEach((t) => t.stop()); tabStream = null; throw Object.assign(new Error('no tab audio'), { name: 'NoTabAudio' }); }
+  // 2) your mic (ME), with echo cancelling in case the meeting plays on speakers
+  stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  await resumed;
+  if (ctx.state !== 'running') { try { await ctx.resume(); } catch (e) {} }
+  const myTab = tabStream, myStream = stream;
+  tabStream.getTracks().forEach((t) => { t.onended = () => { if (tabStream === myTab && sess.running) tabStopped(); }; });
+  const mt = stream.getAudioTracks()[0];
+  if (mt) mt.onended = () => { if (stream === myStream && sess.running) interrupted(); };
+  const myCtx = ctx;
+  ctx.onstatechange = () => { if (ctx === myCtx && sess.running && myCtx.state === 'suspended') myCtx.resume().catch(() => {}); };
+  const merger = ctx.createChannelMerger(2);
+  ctx.createMediaStreamSource(stream).connect(merger, 0, 0);
+  ctx.createMediaStreamSource(new MediaStream(tabStream.getAudioTracks())).connect(merger, 0, 1);
+  sinkGain = ctx.createGain(); sinkGain.gain.value = 0; sinkGain.connect(ctx.destination);
+  const rate = ctx.sampleRate;
+  const code = `class P2 extends AudioWorkletProcessor{constructor(){super();this.l=new Float32Array(2048);this.r=new Float32Array(2048);this.n=0}process(i){const a=i[0];if(a&&a[0]){const L=a[0],R=a[1]||a[0];for(let k=0;k<L.length;k++){this.l[this.n]=L[k];this.r[this.n]=R[k];this.n++;if(this.n===2048){this.port.postMessage({l:this.l,r:this.r});this.l=new Float32Array(2048);this.r=new Float32Array(2048);this.n=0}}}return true}}registerProcessor('cc-tap2',P2);`;
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type: 'application/javascript' })));
+  node = new AudioWorkletNode(ctx, 'cc-tap2', { numberOfInputs: 1, numberOfOutputs: 1, channelCount: 2, channelCountMode: 'explicit', channelInterpretation: 'discrete' });
+  node.port.onmessage = (e) => onAudio2(e.data.l, e.data.r, rate);
+  merger.connect(node); node.connect(sinkGain);
+}
+function tabStopped() {
+  stopAll(true);
+  setStatus('Stopped', 'err');
+  banner('Sharing of the meeting tab stopped. Click Listen and pick the meeting tab again (tick "Also share tab audio"). Everything so far is kept.', 'err', 'Listen', () => start());
 }
 
 async function startAudio() {
@@ -1043,13 +1188,14 @@ async function startAudio() {
 function stopAudio() {
   try { if (node) node.disconnect(); } catch (e) {}
   try { if (stream) stream.getTracks().forEach((t) => t.stop()); } catch (e) {}
+  try { if (tabStream) tabStream.getTracks().forEach((t) => t.stop()); } catch (e) {}
   try { if (ctx) ctx.close(); } catch (e) {}
-  node = null; stream = null; ctx = null; carry = new Float32Array(0); frameFill = 0;
+  node = null; stream = null; tabStream = null; ctx = null; carry = new Float32Array(0); carryR = new Float32Array(0); frameFill = 0; fill2 = 0;
 }
 
 // every 1.5 s: is sound still arriving? If not, restart the mic quietly; if that fails, ask for a tap
 function watchdog() {
-  if (!sess.running || sess.paused || healing || document.hidden) return;
+  if (!sess.running || sess.paused || healing || (document.hidden && !tabMode())) return;
   if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
   if (Date.now() - lastAudioAt > 3500) audioLost();
   else healTries = 0;
@@ -1057,7 +1203,7 @@ function watchdog() {
 }
 async function audioLost() {
   if (healing || !sess.running || sess.paused) return;
-  if (healTries >= 2) { interrupted(); return; }
+  if (healTries >= 2 || tabMode()) { interrupted(); return; }
   healing = true; healTries++;
   setStatus('Restarting mic...', 'paused');
   stopAudio();
@@ -1093,15 +1239,20 @@ async function start() {
   if (!S.dgKey.trim()) { openSettings(); toast('Add the Deepgram key first'); return; }
   if (!S.anKey.trim()) toast('No Anthropic key yet: it will listen but cannot answer');
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { banner('This browser cannot use the microphone here. Open the page over https in Safari or Chrome.', 'err'); return; }
+  if (tabMode() && !navigator.mediaDevices.getDisplayMedia) { banner('This browser cannot hear another tab. Use Chrome or Edge on a computer, or switch Listen through to Phone near laptop in Settings.', 'err', 'Settings', openSettings); return; }
   setStatus('Starting...', 'paused');
-  try { await startAudio(); }
+  try { if (tabMode()) await startAudioTab(); else await startAudio(); }
   catch (e) {
     stopAudio();
     setStatus('Ready', '');
-    banner(e && e.name === 'NotAllowedError' ? 'Microphone blocked. Allow the mic for this site in your browser settings, then tap Listen.' : 'Could not start the microphone: ' + (e.message || e.name), 'err', 'Listen', () => start());
+    let msg = 'Could not start the microphone: ' + (e.message || e.name);
+    if (e && e.name === 'NoTabAudio') msg = 'That share had no sound. Click Listen, pick the meeting tab (Google Meet, Teams or Zoom in Chrome) and tick "Also share tab audio".';
+    else if (e && e.name === 'NotAllowedError') msg = tabMode() ? 'Nothing was shared, or the mic was blocked. Click Listen, pick the meeting tab and tick "Also share tab audio", then allow the mic.' : 'Microphone blocked. Allow the mic for this site in your browser settings, then tap Listen.';
+    else if (e && e.name === 'InvalidStateError' && D !== document) msg = 'Chrome wants the first click in the main tab. Click Listen there once, then come back to the pop-up.';
+    banner(msg, 'err', 'Listen', () => start());
     return;
   }
-  sess.running = true; sess.paused = false; everConnected = false; dgFails = 0;
+  sess.running = true; sess.paused = false; everConnected = false; dgFails = 0; sess.srcInUse = S.source;
   lastAudioAt = Date.now(); healTries = 0; healing = false;
   if (!sess.startedAt) sess.startedAt = Date.now();
   startTimer(); keepAwake();
@@ -1110,7 +1261,10 @@ async function start() {
   keepI = setInterval(() => { if (ws && ws.readyState === 1 && sess.paused) ws.send(JSON.stringify({ type: 'KeepAlive' })); }, 5000);
   clearInterval(watchI); watchI = setInterval(watchdog, 1500);
   const heardBefore = sess.turns.some((t) => typeof t.conn === 'number');
-  if (!heardBefore && sess.meRef == null) beginCheck();
+  if (tabMode()) {
+    if (D === document && window.documentPictureInPicture) banner('Listening to the meeting tab (THEM) and your mic (ME). Pop it out to float over the meeting.', 'check', 'Pop out', popOut);
+    else banner(heardBefore ? 'Listening again. Everything said so far is kept.' : 'Listening to the meeting tab (THEM) and your mic (ME).', '', 'OK');
+  } else if (!heardBefore && sess.meRef == null) beginCheck();
   else banner('Listening again. Everything said so far is kept.', '', 'OK');
   updateMain(); renderCards(); renderTranscript();
 }
@@ -1175,11 +1329,11 @@ function seg(id, key) {
   box.querySelectorAll('button').forEach((b) => b.onclick = () => { S[key] = b.dataset.v; paint(); });
   return paint;
 }
-const paintMode = seg('#segMode', 'mode'), paintLen = seg('#segLen', 'length'), paintLang = seg('#segLang', 'lang'), paintEx = seg('#segEx', 'examples'), paintCode = seg('#segCode', 'codeNotes');
+const paintMode = seg('#segMode', 'mode'), paintLen = seg('#segLen', 'length'), paintLang = seg('#segLang', 'lang'), paintEx = seg('#segEx', 'examples'), paintCode = seg('#segCode', 'codeNotes'), paintSrc = seg('#segSrc', 'source');
 function openSettings() {
   $('#fName').value = S.name; $('#fAbout').value = S.about; $('#fCall').value = S.call; $('#fTerms').value = S.terms;
   $('#fDg').value = S.dgKey; $('#fAn').value = S.anKey; $('#fModel').value = S.model; $('#fSize').value = S.fs;
-  paintMode(); paintLen(); paintLang(); paintEx(); paintCode();
+  paintMode(); paintLen(); paintLang(); paintEx(); paintCode(); paintSrc();
   $('#settingsWrap').classList.add('show');
 }
 function readSettings() {
@@ -1190,12 +1344,15 @@ function closeSettings(save) {
   if (save) {
     const langBefore = store.get('settings', {}).lang, termsBefore = store.get('settings', {}).terms;
     readSettings(); store.set('settings', S); applyLook(); toast('Saved');
-    if (sess.running && ws && (langBefore !== S.lang || termsBefore !== S.terms)) { try { ws.close(); } catch (e) {} }
+    if (sess.running && sess.srcInUse && sess.srcInUse !== S.source) {
+      stopAll(true); setStatus('Ready', '');
+      banner('Listen through changed. Click Listen to start again with the new setting. Everything so far is kept.', '', 'Listen', () => start());
+    } else if (sess.running && ws && (langBefore !== S.lang || termsBefore !== S.terms)) { try { ws.close(); } catch (e) {} }
   }
   $('#settingsWrap').classList.remove('show');
   if (!visibleCards().length) renderCards();
 }
-$('#fSize').oninput = () => document.documentElement.style.setProperty('--fs', $('#fSize').value + 'px');
+$('#fSize').oninput = () => { document.documentElement.style.setProperty('--fs', $('#fSize').value + 'px'); if (D !== document) D.documentElement.style.setProperty('--fs', $('#fSize').value + 'px'); };
 $('#btnSettings').onclick = openSettings;
 $('#btnSave').onclick = () => closeSettings(true);
 $('#btnClose').onclick = () => closeSettings(false);
@@ -1334,8 +1491,40 @@ function stopDemo(silent) {
   updateMain();
 }
 
+/* ---------- floating window (Chrome / Edge on a computer) ---------- */
+let pipWin = null;
+const movable = () => ['.app', '#settingsWrap', '#typeWrap', '#toast'].map((q) => document.querySelector(q) || (pipWin && pipWin.document.querySelector(q))).filter(Boolean);
+async function popOut() {
+  if (!window.documentPictureInPicture) { toast('Pop out needs Chrome or Edge on a computer'); return; }
+  if (pipWin) { try { pipWin.focus(); } catch (e) {} return; }
+  let w;
+  try { w = await documentPictureInPicture.requestWindow({ width: 360, height: 520 }); }
+  catch (e) { toast('Could not open the pop-up: ' + (e.message || e.name)); return; }
+  pipWin = w;
+  document.querySelectorAll('style').forEach((st) => w.document.head.appendChild(st.cloneNode(true)));
+  const title = w.document.createElement('title'); title.textContent = 'Call Copilot'; w.document.head.appendChild(title);
+  w.document.documentElement.classList.add('pip');
+  w.document.documentElement.style.cssText = document.documentElement.style.cssText;
+  w.document.body.append(...movable());
+  D = w.document;
+  const ph = document.createElement('div'); ph.className = 'popped'; ph.id = 'popped';
+  ph.innerHTML = '<div><h2>The copilot is in the pop-up</h2><p>It floats over your meeting. Close the pop-up to bring it back here.</p></div>';
+  document.body.appendChild(ph);
+  w.addEventListener('pagehide', () => {
+    const nodes = movable();
+    const p2 = document.getElementById('popped'); if (p2) p2.remove();
+    document.body.append(...nodes);
+    D = document; pipWin = null;
+    applyLook(); renderCards(); trSig = ''; renderTranscript();
+  });
+  applyLook(); trSig = ''; renderTranscript();
+  if (banner && $('#bannerMsg').textContent.startsWith('Listening to the meeting tab')) banner('');
+}
+if (window.documentPictureInPicture) { $('#btnPop').hidden = false; $('#btnPop').onclick = popOut; }
+
 /* ---------- boot ---------- */
-window.__cc = { sess, S, onDG, maybeAnswer, latestBlock, roleOf, md, systemPrompt, userPrompt, answerNow, answerLine, audioLost, watchdog };
+if (!S.source) S.source = (window.matchMedia && matchMedia('(pointer: fine)').matches && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) ? 'tab' : 'room';
+window.__cc = { sess, S, onDG, maybeAnswer, latestBlock, roleOf, md, systemPrompt, userPrompt, answerNow, answerLine, audioLost, watchdog, popOut, dgUrl };
 restore();
 renderCards(); renderTranscript(); updateMain();
 if (!S.dgKey && !S.anKey && !sess.cards.length) setTimeout(() => { if (!sess.demo && !sess.running) openSettings(); }, 400);

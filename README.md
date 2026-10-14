@@ -36,6 +36,14 @@ A live copilot for calls. Your phone listens to the call, works out which voice 
 - **Swap:** if ME and THEM are the wrong way round. You can also tap a ME / THEM label in the transcript (tap "Live transcript" to open it).
 - **Pause** stops listening. After the call: Settings, **Copy notes** saves the transcript and every answer.
 
+## On a laptop (Chrome or Edge)
+
+- Open the copilot link in a Chrome tab and your meeting (Google Meet, Teams or Zoom on the web) in another tab.
+- Settings, **Listen through: This computer** (the default on a laptop).
+- Click **Listen**, pick the meeting tab and tick **Also share tab audio**, then allow the mic. It hears the meeting directly as THEM and your mic as ME, so no voice check, and headphones are fine.
+- Click **Pop out** (the small window icon at the top) to float a compact copilot over your meeting. Close the pop-up to bring it back to its tab.
+- If you share your screen in the meeting, share a window or tab rather than the whole screen, or the pop-up will be visible too.
+
 ## Good to know
 
 - Answers are written to sound like you talking: plain words, short sentences, and a real-life example (turn examples off in Settings if you don't want them).
