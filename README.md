@@ -39,6 +39,7 @@ A live copilot for calls. Your phone listens to the call, works out which voice 
 ## Good to know
 
 - Answers are written to sound like you talking: plain words, short sentences, and a real-life example (turn examples off in Settings if you don't want them).
+- Code answers come with a plain-English note above every line saying what it does (switch off with Explain code line by line in Settings).
 - Keys and your background stay in this phone's browser only. Call audio goes to Deepgram; the transcript goes to Anthropic.
 - Phones cut the mic when you lock the screen or switch apps. The page keeps the screen awake while listening.
 - Brain: Haiku is the fastest and the default, Sonnet is more thorough, Opus is deepest but slower.

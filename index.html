@@ -72,7 +72,8 @@ button.chip{cursor:pointer}
 .card-a strong{color:#fff}
 .card-a code{font:0.82em/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel2);padding:1px 5px;border-radius:5px}
 .card-a pre{background:#0a0b0e;border:1px solid var(--line);border-radius:10px;padding:10px 12px;overflow-x:auto;margin:.4em 0 .7em;font-size:max(13px,calc(var(--fs)*.72));line-height:1.45}
-.card-a pre code{background:none;padding:0;font-size:1em;line-height:inherit;white-space:pre}
+.card-a pre code{background:none;padding:0;font-size:1em;line-height:inherit;white-space:pre-wrap;overflow-wrap:anywhere}
+.card-a pre .cmt{color:#8fc7a3;font-style:italic}
 .card.old .card-a{max-height:5.2em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
 .card.old.open .card-a{max-height:none;-webkit-mask-image:none;mask-image:none}
 .card.old{opacity:.78}
@@ -211,6 +212,8 @@ button.chip{cursor:pointer}
     <h3>Answers</h3>
     <div class="field"><label>Length</label><div class="seg" id="segLen"><button data-v="short">Short</button><button data-v="medium">Medium</button><button data-v="long">Detailed</button></div></div>
     <div class="field"><label>Real-life example in each answer</label><div class="seg" id="segEx"><button data-v="on">On</button><button data-v="off">Off</button></div></div>
+    <div class="field"><label>Explain code line by line</label><div class="seg" id="segCode"><button data-v="on">On</button><button data-v="off">Off</button></div>
+      <div class="help">Every line of code comes with a plain-English note above it saying what it does.</div></div>
     <div class="field"><label>Language heard</label><div class="seg" id="segLang"><button data-v="en">English</button><button data-v="multi">English + Hindi</button></div></div>
     <div class="field"><label for="fModel">Brain</label>
       <select id="fModel">
@@ -277,7 +280,7 @@ const store = {
   del(k) { try { localStorage.removeItem('cc.' + k); } catch (e) {} }
 };
 
-const DEFAULTS = { dgKey: '', anKey: '', mode: 'interview', name: '', about: '', call: '', terms: '', length: 'short', lang: 'en', model: 'claude-haiku-5-5', fs: 19, examples: 'on' };
+const DEFAULTS = { dgKey: '', anKey: '', mode: 'interview', name: '', about: '', call: '', terms: '', length: 'short', lang: 'en', model: 'claude-haiku-5-5', fs: 19, examples: 'on', codeNotes: 'on' };
 let S = Object.assign({}, DEFAULTS, store.get('settings', {}));
 
 /* ---------- dom ---------- */
@@ -365,7 +368,8 @@ function md(src) {
     if (i % 2 === 1) {
       const nl = p.indexOf('\n');
       const code = nl >= 0 ? p.slice(nl + 1) : '';
-      html += '<pre><code>' + esc(code.replace(/\n$/, '')) + '</code></pre>';
+      const lines = code.replace(/\n$/, '').split('\n').map((ln) => /^\s*(#(?!!)|\/\/|--)/.test(ln) ? '<span class="cmt">' + esc(ln) + '</span>' : esc(ln));
+      html += '<pre><code>' + lines.join('\n') + '</code></pre>';
     } else html += mdBlocks(p);
   });
   return html;
@@ -681,7 +685,8 @@ How to write:
 - Ground everything in ME's background below. Never invent employers, dates, numbers, clients or projects. If a specific is needed and it is not in the background, write [add example] or [number].
 - Stay consistent with what ME has already said on this call. A follow-up question builds on the earlier answer.
 - Concept question: plain definition, then one concrete example.
-- Coding task: one line of approach, then a code block in the language they asked for (Python if not said), then one line with time and space complexity.
+- Coding task: one line of approach, then a code block in the language they asked for (Python if not said), then one line with time and space complexity.${S.codeNotes === 'off' ? '' : `
+- Any code, command, query or config you give: put a short comment on its own line directly above every line of code, saying in plain English what that line does, written for someone who does not code (for example "# go through the log one line at a time"). Use the language's own comment mark (# for Python, Bash and YAML; // for JavaScript, Java, Go and C; -- for SQL). Keep each comment under about 10 words. No comment above blank lines. The code must still run as written.`}
 - Behavioural question: a short story from the background in situation, action, result order.
 - Use **bold** sparingly for the 2 or 3 words ME must not miss.
 - If the newest THEM speech is not asking ME anything (small talk, an acknowledgement, they are still setting up the question, or it is really ME talking), reply with exactly NOQ and nothing else.
@@ -1170,11 +1175,11 @@ function seg(id, key) {
   box.querySelectorAll('button').forEach((b) => b.onclick = () => { S[key] = b.dataset.v; paint(); });
   return paint;
 }
-const paintMode = seg('#segMode', 'mode'), paintLen = seg('#segLen', 'length'), paintLang = seg('#segLang', 'lang'), paintEx = seg('#segEx', 'examples');
+const paintMode = seg('#segMode', 'mode'), paintLen = seg('#segLen', 'length'), paintLang = seg('#segLang', 'lang'), paintEx = seg('#segEx', 'examples'), paintCode = seg('#segCode', 'codeNotes');
 function openSettings() {
   $('#fName').value = S.name; $('#fAbout').value = S.about; $('#fCall').value = S.call; $('#fTerms').value = S.terms;
   $('#fDg').value = S.dgKey; $('#fAn').value = S.anKey; $('#fModel').value = S.model; $('#fSize').value = S.fs;
-  paintMode(); paintLen(); paintLang(); paintEx();
+  paintMode(); paintLen(); paintLang(); paintEx(); paintCode();
   $('#settingsWrap').classList.add('show');
 }
 function readSettings() {
@@ -1264,7 +1269,7 @@ const DEMO_ANS = [
   `Sure. I'm a business consultant by day, working on strategy, business analysis and pre-sales, and I also run a small AI-first agency where I build automation and web products for clients.\n\nWhat ties it together is that I like taking a messy business problem and turning it into a working system.\n\nIf they probe:\n- Mention one client automation you shipped [add example]\n- Say why this role is the next step`,
   `A process is an independent program with its **own memory space**. A thread is a lighter unit of execution **inside a process**, and threads share that process's memory.\n\nSo threads are cheaper to create and can share data easily, but they need locks to avoid stepping on each other.\n\nIf they probe:\n- Context switching between processes costs more\n- A crash in one thread can take down the whole process`,
   `No, not with standard CPython. The **GIL** lets only one thread run Python bytecode at a time, so CPU bound work does not get faster with threads.\n\nFor CPU heavy work I'd use **multiprocessing** or a process pool. Threads still help for I/O bound work, like network calls, because the GIL is released while waiting.\n\nIf they probe:\n- Newer free-threaded Python builds can remove the GIL, but they're still opt-in`,
-  `I'll count characters first, then return the first one with a count of one.\n\n\`\`\`python\nfrom collections import Counter\n\ndef first_unique(s):\n    counts = Counter(s)\n    for ch in s:\n        if counts[ch] == 1:\n            return ch\n    return None\n\`\`\`\n\nTime O(n), space O(k) where k is the number of distinct characters.`
+  `I'll count every character first, then walk the string and return the first one that only shows up once.\n\n\`\`\`python\n# bring in a ready-made counting tool\nfrom collections import Counter\n\n# a function that takes a piece of text\ndef first_unique(s):\n    # count how many times each letter appears\n    counts = Counter(s)\n    # go through the letters in their original order\n    for ch in s:\n        # if this letter appears only once\n        if counts[ch] == 1:\n            # that's our answer, hand it back\n            return ch\n    # every letter repeats, so there is no answer\n    return None\n\`\`\`\n\nTime O(n), space O(k) where k is the number of distinct characters.`
 ];
 let demoTimers = [], demoAnsIdx = 0;
 async function demoAnswer(card, onText) {
