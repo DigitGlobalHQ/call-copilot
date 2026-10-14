@@ -30,13 +30,15 @@ A live copilot for calls. Your phone listens to the call, works out which voice 
 ## During the call
 
 - The newest answer card sits on top. Older ones fold below; tap to open.
-- **Answer now:** answers the latest thing that was asked, even if they are still mid-sentence.
+- **Answer now:** catches the last words still being spoken, then answers the latest thing that was asked, using the whole conversation so far.
+- **Answer on any line:** open the Live transcript (tap its title). The whole call is there, and every line has an **Answer** button for an answer to that exact line, even from earlier in the call.
 - **Type:** ask privately, e.g. "shorter", "give me a number for that".
 - **Swap:** if ME and THEM are the wrong way round. You can also tap a ME / THEM label in the transcript (tap "Live transcript" to open it).
 - **Pause** stops listening. After the call: Settings, **Copy notes** saves the transcript and every answer.
 
 ## Good to know
 
+- Answers are written to sound like you talking: plain words, short sentences, and a real-life example (turn examples off in Settings if you don't want them).
 - Keys and your background stay in this phone's browser only. Call audio goes to Deepgram; the transcript goes to Anthropic.
 - Phones cut the mic when you lock the screen or switch apps. The page keeps the screen awake while listening.
 - Brain: Haiku is the fastest and the default, Sonnet is more thorough, Opus is deepest but slower.

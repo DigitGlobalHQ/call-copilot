@@ -109,9 +109,9 @@ button.chip{cursor:pointer}
 .line .tx{flex:1;color:#d6d9df;min-width:0;overflow-wrap:anywhere}
 .line.interim .tx{color:var(--muted);font-style:italic}
 .line .who{cursor:pointer}
-.line .ans{flex:none;font-size:12px;color:var(--them);border:1px solid rgba(232,184,109,.35);border-radius:7px;padding:2px 7px;display:none}
-.live.expanded .line .ans{display:inline-block}
-.live.expanded .line.me .ans{display:none}
+.line .ans{flex:none;font-size:12px;font-weight:600;color:var(--them);border:1px solid rgba(232,184,109,.35);border-radius:7px;padding:3px 8px;display:inline-block;margin-top:1px}
+.line.me .ans{color:var(--me);border-color:rgba(127,168,236,.35)}
+.line .ans:active{transform:scale(.96)}
 .hint{color:var(--dim);font-size:13px;padding:2px 0 4px}
 
 /* controls */
@@ -210,6 +210,7 @@ button.chip{cursor:pointer}
 
     <h3>Answers</h3>
     <div class="field"><label>Length</label><div class="seg" id="segLen"><button data-v="short">Short</button><button data-v="medium">Medium</button><button data-v="long">Detailed</button></div></div>
+    <div class="field"><label>Real-life example in each answer</label><div class="seg" id="segEx"><button data-v="on">On</button><button data-v="off">Off</button></div></div>
     <div class="field"><label>Language heard</label><div class="seg" id="segLang"><button data-v="en">English</button><button data-v="multi">English + Hindi</button></div></div>
     <div class="field"><label for="fModel">Brain</label>
       <select id="fModel">
@@ -245,7 +246,8 @@ button.chip{cursor:pointer}
       <li>Tap the <b>INTERVIEW / MEETING</b> label at the top to switch mode.</li>
       <li>Questions from the other side get an answer card on top. Follow-ups get a new card.</li>
       <li>Labels wrong? Tap <b>Swap</b>, or tap a ME / THEM label in the transcript.</li>
-      <li>Missed one? <b>Answer now</b> answers the latest thing that was asked, even mid-sentence. <b>Type</b> lets you ask privately.</li>
+      <li>Missed one? <b>Answer now</b> catches the last words being spoken and answers the latest thing asked. <b>Type</b> lets you ask privately.</li>
+      <li>Every line in the transcript has an <b>Answer</b> button. Tap it to get an answer to that exact line, even from earlier in the call.</li>
       <li>Keep this screen open. Phones stop the mic when you switch apps or lock the screen.</li>
     </ol>
     <div class="actions"><button class="btn" id="btnClose">Close</button></div>
@@ -275,7 +277,7 @@ const store = {
   del(k) { try { localStorage.removeItem('cc.' + k); } catch (e) {} }
 };
 
-const DEFAULTS = { dgKey: '', anKey: '', mode: 'interview', name: '', about: '', call: '', terms: '', length: 'short', lang: 'en', model: 'claude-haiku-5-5', fs: 19 };
+const DEFAULTS = { dgKey: '', anKey: '', mode: 'interview', name: '', about: '', call: '', terms: '', length: 'short', lang: 'en', model: 'claude-haiku-5-5', fs: 19, examples: 'on' };
 let S = Object.assign({}, DEFAULTS, store.get('settings', {}));
 
 /* ---------- dom ---------- */
@@ -411,7 +413,7 @@ function autoResolve(conn) {
 
 function setMe(conn, spk, src, quiet) {
   const m = mapFor(conn);
-  m.me = spk; m.src = src;
+  m.me = spk; m.src = src; trVer++;
   updateRefs(conn);
   renderTranscript();
   if (!quiet) toast(spk == null ? 'Cleared which voice is you' : 'Got it, that voice is you');
@@ -490,20 +492,33 @@ function ingestFinal(conn, words) {
       sess.turns.push({ id: nextId++, conn, spk: r.spk, text: r.text, start: r.start, end: r.end });
     }
   }
-  if (sess.turns.length > 600) sess.turns.splice(0, sess.turns.length - 600);
+  if (sess.turns.length > 1500) sess.turns.splice(0, sess.turns.length - 1500);
   autoResolve(conn);
   renderTranscript();
   saveSoon();
 }
 
-function renderTranscript() {
+// Full call transcript. Rebuilds only when lines change; live words update in place,
+// and it never yanks you to the bottom while you are scrolled up reading an older line.
+let trSig = '', trVer = 0;
+function renderTranscript(jumpToEnd) {
   const expanded = $('#live').classList.contains('expanded');
-  const list = expanded ? sess.turns.slice(-80) : sess.turns.slice(-3);
-  trEl.textContent = '';
-  if (!list.length && !sess.interim) { trEl.appendChild(el('div', 'hint', sess.running ? 'Listening...' : 'Nothing heard yet.')); return; }
-  for (const t of list) trEl.appendChild(lineEl(t, false));
-  if (sess.interim && sess.interim.text) trEl.appendChild(lineEl(sess.interim, true));
-  if (expanded) trEl.scrollTop = trEl.scrollHeight;
+  const list = expanded ? sess.turns : sess.turns.slice(-3);
+  const atEnd = trEl.scrollHeight - trEl.scrollTop - trEl.clientHeight < 80;
+  const last = list[list.length - 1];
+  const sig = (expanded ? 'E' : 'C') + list.length + ':' + (last ? last.id + '/' + last.text.length : '') + ':' + trVer + ':' + (sess.running ? 1 : 0);
+  if (sig !== trSig) {
+    trSig = sig;
+    trEl.textContent = '';
+    if (!list.length) trEl.appendChild(el('div', 'hint', sess.running ? 'Listening...' : 'Nothing heard yet.'));
+    for (const t of list) trEl.appendChild(lineEl(t, false));
+  }
+  const old = trEl.querySelector('.line.interim'); if (old) old.remove();
+  if (sess.interim && sess.interim.text) {
+    const h = trEl.querySelector('.hint'); if (h) h.remove();
+    trEl.appendChild(lineEl(sess.interim, true));
+  }
+  if (expanded && (jumpToEnd || atEnd)) trEl.scrollTop = trEl.scrollHeight;
 }
 function lineEl(t, interim) {
   const role = roleOf(t.conn, t.spk);
@@ -512,14 +527,14 @@ function lineEl(t, interim) {
   if (!interim && t.conn !== 'typed' && t.conn !== 'old') { w.title = 'Tap to fix who this is'; w.onclick = (e) => { e.stopPropagation(); toggleLine(t); }; }
   d.appendChild(w);
   d.appendChild(el('span', 'tx', t.text));
-  if (!interim && role !== 'me' && t.conn !== 'typed') {
+  if (!interim && t.conn !== 'typed') {
     const a = el('button', 'ans', 'Answer');
-    a.onclick = (e) => { e.stopPropagation(); answerText(t.text, 'line-' + t.id); };
+    a.onclick = (e) => { e.stopPropagation(); answerLine(t); };
     d.appendChild(a);
   }
   return d;
 }
-$('#liveHead').onclick = () => { $('#live').classList.toggle('expanded'); renderTranscript(); };
+$('#liveHead').onclick = () => { $('#live').classList.toggle('expanded'); trSig = ''; renderTranscript(true); };
 
 /* ---------- question detection ---------- */
 const wc = (s) => (s.trim().match(/\S+/g) || []).length;
@@ -547,13 +562,25 @@ function latestBlock() {
   return { blockId: 'b' + first.id, text: parts.join(' ') };
 }
 
-function newCard(blockId, qStart, q, show, typed, now) {
-  const c = { id: nextId++, blockId, qStart, q, text: '', status: 'wait', gen: 0, pending: !show, typed: !!typed, now: !!now, created: Date.now() };
-  sess.cards.push(c); runCard(c); renderCards(true);
+function newCard(blockId, qStart, q, show, typed, now, extra) {
+  const c = Object.assign({ id: nextId++, blockId, qStart, q, text: '', status: 'wait', gen: 0, pending: !show, typed: !!typed, now: !!now, created: Date.now() }, extra || {});
+  sess.cards.push(c);
+  if (!c.hold) runCard(c);
+  renderCards(true); updateThinking();
   return c;
+}
+// answer one exact line from the transcript, old or new
+function answerLine(t) {
+  const blockId = 'line-' + t.id;
+  const c = sess.cards.find((x) => x.blockId === blockId);
+  if (c) { c.q = t.text; c.hidden = false; c.pending = false; c.id = nextId++; runCard(c); renderCards(true); }
+  else newCard(blockId, 0, t.text, true, false, false, { lineId: t.id, lineRole: roleOf(t.conn, t.spk) });
+  if ($('#live').classList.contains('expanded')) { $('#live').classList.remove('expanded'); renderTranscript(); }
+  toast('Answering that line');
 }
 function maybeAnswer(force) {
   if (sess.check && !force) return;
+  if (nowBusy && !force) return;
   const b = latestBlock();
   if (!b) { if (force) toast('Nothing from them yet'); return; }
   // a block can hold several questions if ME stays quiet; each gets its own card
@@ -579,8 +606,27 @@ function maybeAnswer(force) {
   if (card.hidden) { card.hidden = false; card.pending = !force; }
   runCard(card); renderCards();
 }
+// ask Deepgram to finalise whatever is mid-sentence, wait briefly for it
+let finalWaiters = [];
+function flushTranscript(maxMs) {
+  return new Promise((res) => {
+    if (!ws || ws.readyState !== 1 || !sess.running || sess.paused) return res(false);
+    try { ws.send(JSON.stringify({ type: 'Finalize' })); } catch (e) { return res(false); }
+    const t = setTimeout(() => res(false), maxMs);
+    finalWaiters.push(() => { clearTimeout(t); setTimeout(() => res(true), 20); });
+  });
+}
+let nowBusy = false;
+async function answerNow() {
+  if (nowBusy) return;
+  nowBusy = true; clearTimeout(trigT);
+  try {
+    if (sess.interim && sess.interim.text) { $('#liveLabel').textContent = 'Live transcript \u00b7 catching last words'; await flushTranscript(600); }
+    answerNowInner();
+  } finally { nowBusy = false; updateThinking(); }
+}
 // "Answer now": the latest thing asked, including words still being spoken
-function answerNow() {
+function answerNowInner() {
   const it = sess.interim && sess.interim.text ? sess.interim.text.trim() : '';
   const itThem = it && roleOf(sess.interim.conn, sess.interim.spk) !== 'me';
   const b = latestBlock();
@@ -627,8 +673,10 @@ Your job: when THEM ask ME something, write what ME should say back right now. M
 ${mode}
 
 How to write:
-- Write as ME, first person, plain spoken English with UK spelling. No filler, no "Great question", never use em dashes.
-- First sentence is the direct answer. ${len}
+- Sound like a real person talking to colleagues, not like an AI. Everyday words, contractions (I'm, we've, it's), short sentences, the way you would explain it over a cup of tea. Keep it basic and relevant to exactly what was asked. If a technical term is needed, say it and explain it in a few plain words.
+- Never say "Great question", "Certainly", "Absolutely", "As an AI", "It's important to note", "In conclusion" or "leverage". No corporate jargon unless they used the word first. First person, UK spelling, never use em dashes.
+- First sentence is the direct answer. ${len}${S.examples === 'off' ? '' : `
+- Then a line starting "Example:" with one short, concrete, real-life example that fits what this conversation is about. Prefer something from ME's background or from earlier in this call; otherwise use an everyday situation and phrase it as a general case ("say a server runs out of disk..."), never as something ME did.`}
 - After that, only if useful, a line "If they probe:" followed by 2 or 3 short bullets of extra depth.
 - Ground everything in ME's background below. Never invent employers, dates, numbers, clients or projects. If a specific is needed and it is not in the background, write [add example] or [number].
 - Stay consistent with what ME has already said on this call. A follow-up question builds on the earlier answer.
@@ -648,10 +696,11 @@ About this call:
 ${S.call.trim() || '(not provided)'}
 </call>`;
 }
-function transcriptText(maxChars = 9000) {
+function transcriptText(maxChars = 40000, uptoId) {
   const lines = [];
   for (const t of sess.turns) {
     if (t.conn === 'typed') continue;
+    if (uptoId != null && t.id > uptoId) break;
     lines.push(LABEL[roleOf(t.conn, t.spk)] + ': ' + t.text);
   }
   let s = lines.join('\n');
@@ -659,6 +708,11 @@ function transcriptText(maxChars = 9000) {
   return s || '(nothing yet)';
 }
 function userPrompt(card) {
+  if (card.lineId != null) {
+    const t = sess.turns.find((x) => x.id === card.lineId);
+    const who = t ? LABEL[roleOf(t.conn, t.spk)] : 'THEM';
+    return `Transcript of the call up to that moment (oldest first):\n${transcriptText(40000, card.lineId)}\n\nME tapped this line from the call (said by ${who}): "${card.q}"\n\nTreat it as the question or topic ME needs to respond to, as of that moment in the call, and write what ME should say. If it was ME's own line, write a stronger way for ME to say it. Never reply NOQ.`;
+  }
   if (card.now) {
     const it = sess.interim && sess.interim.text ? `\n(still speaking, not final) ${LABEL[roleOf(sess.interim.conn, sess.interim.spk)]}: ${sess.interim.text}` : '';
     return `Live transcript so far (oldest first):\n${transcriptText()}${it}\n\nME just tapped "Answer now". Find the most recent question or request aimed at ME (usually the last thing THEM said; it may be unfinished, or mislabelled as ME or ?) and write what ME should say right now. Best guess at it: "${card.q}". Never reply NOQ.`;
@@ -713,7 +767,7 @@ async function runCard(card) {
   const onText = (t) => {
     if (gen !== card.gen) return;
     const trimmed = t.trim();
-    if (!card.typed && !card.now && (/^N(O(Q)?)?$/.test(trimmed) || trimmed.startsWith('NOQ'))) return; // might be NOQ, hold
+    if (!card.typed && !card.now && card.lineId == null && (/^N(O(Q)?)?$/.test(trimmed) || trimmed.startsWith('NOQ'))) return; // might be NOQ, hold
     card.text = t; card.status = 'stream';
     if (card.pending) { card.pending = false; renderCards(true); }
     else paintCard(card);
@@ -738,7 +792,7 @@ async function runCard(card) {
       }
     }
     if (gen !== card.gen) return;
-    if (!card.typed && !card.now && full.trim().startsWith('NOQ')) {
+    if (!card.typed && !card.now && card.lineId == null && full.trim().startsWith('NOQ')) {
       if (!card.text) { card.status = 'noq'; card.hidden = true; card.pending = false; renderCards(); updateThinking(); return; }
       // a longer version of the block turned out not to be a question: keep the earlier answer
       card.status = 'done';
@@ -766,7 +820,8 @@ function renderCards(scrollTop) {
     const a = el('article', 'card ' + (i === 0 ? 'latest open' : 'old'));
     a.dataset.id = c.id;
     const q = el('div', 'card-q');
-    q.appendChild(el('span', 'who ' + (c.typed ? 'you' : 'them'), c.typed ? 'YOU' : 'THEM'));
+    const r = c.typed ? 'you' : (c.lineId != null ? (c.lineRole || 'them') : 'them');
+    q.appendChild(el('span', 'who ' + r, c.typed ? 'YOU' : LABEL[r]));
     q.appendChild(el('span', 'qt', c.q));
     a.appendChild(q);
     const body = el('div', 'card-a'); a.appendChild(body);
@@ -894,8 +949,10 @@ function onDG(conn, m) {
       return;
     }
     sess.interim = null;
+    if (words.length) ingestFinal(conn, words);
+    if (finalWaiters.length) finalWaiters.splice(0).forEach((f) => f());
+    if (nowBusy) { if (!words.length) renderTranscript(); return; } // Answer now is about to handle it
     if (words.length) {
-      ingestFinal(conn, words);
       const last = sess.turns[sess.turns.length - 1];
       const role = last ? roleOf(last.conn, last.spk) : 'unk';
       if (role === 'me') {
@@ -1113,11 +1170,11 @@ function seg(id, key) {
   box.querySelectorAll('button').forEach((b) => b.onclick = () => { S[key] = b.dataset.v; paint(); });
   return paint;
 }
-const paintMode = seg('#segMode', 'mode'), paintLen = seg('#segLen', 'length'), paintLang = seg('#segLang', 'lang');
+const paintMode = seg('#segMode', 'mode'), paintLen = seg('#segLen', 'length'), paintLang = seg('#segLang', 'lang'), paintEx = seg('#segEx', 'examples');
 function openSettings() {
   $('#fName').value = S.name; $('#fAbout').value = S.about; $('#fCall').value = S.call; $('#fTerms').value = S.terms;
   $('#fDg').value = S.dgKey; $('#fAn').value = S.anKey; $('#fModel').value = S.model; $('#fSize').value = S.fs;
-  paintMode(); paintLen(); paintLang();
+  paintMode(); paintLen(); paintLang(); paintEx();
   $('#settingsWrap').classList.add('show');
 }
 function readSettings() {
@@ -1214,7 +1271,8 @@ async function demoAnswer(card, onText) {
   const lower = card.q.toLowerCase();
   let idx = /background/.test(lower) ? 0 : /process and a thread/.test(lower) ? 1 : /python/.test(lower) && /thread/.test(lower) ? 2 : /function|non repeating/.test(lower) ? 3 : -1;
   if (card.typed) idx = -2;
-  const full = idx === -2 ? 'Demo mode has no brain attached. Add your Anthropic key to ask privately.' : idx === -1 ? 'NOQ' : DEMO_ANS[idx];
+  if (idx === -1 && (card.now || card.lineId != null)) idx = -2;
+  const full = idx === -2 ? 'Demo mode has no brain attached. Add your Anthropic key in Settings to answer any line.' : idx === -1 ? 'NOQ' : DEMO_ANS[idx];
   if (full === 'NOQ') { await sleep(400); return full; }
   await sleep(700);
   const gen = card.gen;
@@ -1272,7 +1330,7 @@ function stopDemo(silent) {
 }
 
 /* ---------- boot ---------- */
-window.__cc = { sess, S, onDG, maybeAnswer, latestBlock, roleOf, md, systemPrompt, userPrompt, answerNow, audioLost, watchdog };
+window.__cc = { sess, S, onDG, maybeAnswer, latestBlock, roleOf, md, systemPrompt, userPrompt, answerNow, answerLine, audioLost, watchdog };
 restore();
 renderCards(); renderTranscript(); updateMain();
 if (!S.dgKey && !S.anKey && !sess.cards.length) setTimeout(() => { if (!sess.demo && !sess.running) openSettings(); }, 400);
