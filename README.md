@@ -24,12 +24,13 @@ A live copilot for calls. Your phone listens to the call, works out which voice 
 - Settings, **This call:** company, role, job description or agenda. Add tricky words (names, tech terms) so they are spelt right.
 - **Laptop audio on speakers, not headphones.** The phone has to hear them.
 - Phone flat on the desk near the laptop, screen on, page open.
-- Tap **Start** and say "testing, testing". The banner confirms it has your voice.
+- Tap **Listen** and say "testing, testing". The banner confirms it has your voice.
+- If listening ever stops (a phone call, app switch, screen lock or bad network), tap **Listen** again. It carries on and keeps everything said so far.
 
 ## During the call
 
 - The newest answer card sits on top. Older ones fold below; tap to open.
-- **Answer now:** answers the last thing they said, if it missed it.
+- **Answer now:** answers the latest thing that was asked, even if they are still mid-sentence.
 - **Type:** ask privately, e.g. "shorter", "give me a number for that".
 - **Swap:** if ME and THEM are the wrong way round. You can also tap a ME / THEM label in the transcript (tap "Live transcript" to open it).
 - **Pause** stops listening. After the call: Settings, **Copy notes** saves the transcript and every answer.
@@ -38,7 +39,8 @@ A live copilot for calls. Your phone listens to the call, works out which voice 
 
 - Keys and your background stay in this phone's browser only. Call audio goes to Deepgram; the transcript goes to Anthropic.
 - Phones cut the mic when you lock the screen or switch apps. The page keeps the screen awake while listening.
-- Brain: Haiku is fastest, Sonnet is the default balance, Opus is deepest but slower.
+- Brain: Haiku is the fastest and the default, Sonnet is more thorough, Opus is deepest but slower.
+- Tap the INTERVIEW / MEETING label at the top to switch mode. Meeting mode gives code, commands and queries straight away when asked.
 - Both services charge by usage. Check current pricing on each console.
 - **Watch a demo** on the home screen runs a scripted interview with no keys, so you can see the flow first.
 

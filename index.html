@@ -38,6 +38,7 @@ a{color:var(--me)}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(115,198,156,.55)}70%{box-shadow:0 0 0 9px rgba(115,198,156,0)}100%{box-shadow:0 0 0 0 rgba(115,198,156,0)}}
 #statusText{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #timer{color:var(--muted);font-variant-numeric:tabular-nums;font-size:14px}
+button.chip{cursor:pointer}
 .chip{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
 .iconbtn{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:var(--muted)}
 .iconbtn:active{background:var(--panel2)}
@@ -150,7 +151,7 @@ a{color:var(--me)}
 <div class="app">
   <header class="bar">
     <div class="status"><span class="dot" id="dot"></span><span id="statusText">Ready</span><span id="timer"></span></div>
-    <span class="chip" id="modeChip">Interview</span>
+    <button class="chip" id="modeChip" title="Tap to switch mode">Interview</button>
     <button class="iconbtn" id="btnSettings" aria-label="Settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
     </button>
@@ -212,8 +213,8 @@ a{color:var(--me)}
     <div class="field"><label>Language heard</label><div class="seg" id="segLang"><button data-v="en">English</button><button data-v="multi">English + Hindi</button></div></div>
     <div class="field"><label for="fModel">Brain</label>
       <select id="fModel">
-        <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (balanced)</option>
         <option value="claude-haiku-5-5">Claude Haiku 5.5 (fastest)</option>
+        <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (balanced)</option>
         <option value="claude-opus-5-5">Claude Opus 5.5 (deepest, slower)</option>
       </select></div>
     <div class="field"><label for="fSize">Answer text size</label><input id="fSize" type="range" min="15" max="26" step="1"></div>
@@ -239,10 +240,12 @@ a{color:var(--me)}
     <ol class="howto">
       <li>Laptop call audio on <b>speakers</b>, not headphones. The phone has to hear them.</li>
       <li>Phone flat on the desk between you and the laptop, screen up, this page open.</li>
-      <li>Tap <b>Start</b> before the call and say "testing, testing" so it learns which voice is you.</li>
+      <li>Tap <b>Listen</b> before the call and say "testing, testing" so it learns which voice is you.</li>
+      <li>If listening ever stops, tap <b>Listen</b> again. It carries on and keeps everything said so far.</li>
+      <li>Tap the <b>INTERVIEW / MEETING</b> label at the top to switch mode.</li>
       <li>Questions from the other side get an answer card on top. Follow-ups get a new card.</li>
       <li>Labels wrong? Tap <b>Swap</b>, or tap a ME / THEM label in the transcript.</li>
-      <li>Missed one? <b>Answer now</b> answers the latest thing they said. <b>Type</b> lets you ask privately.</li>
+      <li>Missed one? <b>Answer now</b> answers the latest thing that was asked, even mid-sentence. <b>Type</b> lets you ask privately.</li>
       <li>Keep this screen open. Phones stop the mic when you switch apps or lock the screen.</li>
     </ol>
     <div class="actions"><button class="btn" id="btnClose">Close</button></div>
@@ -272,7 +275,7 @@ const store = {
   del(k) { try { localStorage.removeItem('cc.' + k); } catch (e) {} }
 };
 
-const DEFAULTS = { dgKey: '', anKey: '', mode: 'interview', name: '', about: '', call: '', terms: '', length: 'short', lang: 'en', model: 'claude-sonnet-5-5', fs: 19 };
+const DEFAULTS = { dgKey: '', anKey: '', mode: 'interview', name: '', about: '', call: '', terms: '', length: 'short', lang: 'en', model: 'claude-haiku-5-5', fs: 19 };
 let S = Object.assign({}, DEFAULTS, store.get('settings', {}));
 
 /* ---------- dom ---------- */
@@ -544,8 +547,8 @@ function latestBlock() {
   return { blockId: 'b' + first.id, text: parts.join(' ') };
 }
 
-function newCard(blockId, qStart, q, show, typed) {
-  const c = { id: nextId++, blockId, qStart, q, text: '', status: 'wait', gen: 0, pending: !show, typed: !!typed, created: Date.now() };
+function newCard(blockId, qStart, q, show, typed, now) {
+  const c = { id: nextId++, blockId, qStart, q, text: '', status: 'wait', gen: 0, pending: !show, typed: !!typed, now: !!now, created: Date.now() };
   sess.cards.push(c); runCard(c); renderCards(true);
   return c;
 }
@@ -576,6 +579,25 @@ function maybeAnswer(force) {
   if (card.hidden) { card.hidden = false; card.pending = !force; }
   runCard(card); renderCards();
 }
+// "Answer now": the latest thing asked, including words still being spoken
+function answerNow() {
+  const it = sess.interim && sess.interim.text ? sess.interim.text.trim() : '';
+  const itThem = it && roleOf(sess.interim.conn, sess.interim.spk) !== 'me';
+  const b = latestBlock();
+  let card = null, q = '';
+  if (b) {
+    const segs = sess.cards.filter((c) => c.blockId === b.blockId && !c.typed).sort((x, y) => (x.qStart || 0) - (y.qStart || 0));
+    card = segs[segs.length - 1] || null;
+    q = b.text.slice(card ? (card.qStart || 0) : 0).trim();
+  }
+  if (itThem) q = (q ? q + ' ' : '') + it;
+  if (!q) q = sess.turns.filter((t) => t.conn !== 'typed').slice(-2).map((t) => t.text).join(' ') || it;
+  if (!q) { toast('Nothing heard yet'); return; }
+  if (card) {
+    card.q = q; card.now = true; card.hidden = false; card.pending = false; card.id = nextId++;
+    runCard(card); renderCards(true);
+  } else newCard(b ? b.blockId : 'now-' + Date.now(), 0, q, true, false, true);
+}
 function answerText(text, blockId, typed) {
   const c = sess.cards.find((x) => x.blockId === blockId);
   if (!c) { newCard(blockId, 0, text, true, typed); return; }
@@ -596,7 +618,7 @@ function systemPrompt() {
     long: 'The part to say can run to 8 sentences, with clear structure if the question needs it.'
   }[S.length] || '';
   const mode = S.mode === 'meeting'
-    ? `This is a work meeting. Help ME respond well: what to say, plus the facts, numbers, code or concept they asked for. If THEM assign ME an action, end with a line "Action:" and the action. Prefer short bullets when ME needs to give several points.`
+    ? `This is a work meeting. Help ME respond well: what to say, plus the facts, numbers, code or concept they asked for. If they ask for code, a command, a query or a config, give one line ME can say, then the code block straight away. If THEM assign ME an action, end with a line "Action:" and the action. Prefer short bullets when ME needs to give several points.`
     : `This is a job interview. Help ME answer like a strong candidate: direct, structured, specific, honest about limits.`;
   return `You are a live call copilot running on ${name}'s phone. You receive a live, automatic speech transcript of a call. Lines marked ME are ${name}. Lines marked THEM are the other person or people. Lines marked ? are not yet attributed; work out from the content who is talking. Expect misheard words and fix them in your head.
 
@@ -637,6 +659,10 @@ function transcriptText(maxChars = 9000) {
   return s || '(nothing yet)';
 }
 function userPrompt(card) {
+  if (card.now) {
+    const it = sess.interim && sess.interim.text ? `\n(still speaking, not final) ${LABEL[roleOf(sess.interim.conn, sess.interim.spk)]}: ${sess.interim.text}` : '';
+    return `Live transcript so far (oldest first):\n${transcriptText()}${it}\n\nME just tapped "Answer now". Find the most recent question or request aimed at ME (usually the last thing THEM said; it may be unfinished, or mislabelled as ME or ?) and write what ME should say right now. Best guess at it: "${card.q}". Never reply NOQ.`;
+  }
   if (card.typed) return `Live transcript so far (oldest first):\n${transcriptText()}\n\nME is asking you privately (THEM cannot see this): "${card.q}"\n\nAnswer ME directly and briefly. Do not reply NOQ.`;
   return `Live transcript so far (oldest first):\n${transcriptText()}\n\nNewest from THEM: "${card.q}"\n\nWrite what ME should say now, or NOQ.`;
 }
@@ -687,7 +713,7 @@ async function runCard(card) {
   const onText = (t) => {
     if (gen !== card.gen) return;
     const trimmed = t.trim();
-    if (!card.typed && (/^N(O(Q)?)?$/.test(trimmed) || trimmed.startsWith('NOQ'))) return; // might be NOQ, hold
+    if (!card.typed && !card.now && (/^N(O(Q)?)?$/.test(trimmed) || trimmed.startsWith('NOQ'))) return; // might be NOQ, hold
     card.text = t; card.status = 'stream';
     if (card.pending) { card.pending = false; renderCards(true); }
     else paintCard(card);
@@ -712,7 +738,7 @@ async function runCard(card) {
       }
     }
     if (gen !== card.gen) return;
-    if (!card.typed && full.trim().startsWith('NOQ')) {
+    if (!card.typed && !card.now && full.trim().startsWith('NOQ')) {
       if (!card.text) { card.status = 'noq'; card.hidden = true; card.pending = false; renderCards(); updateThinking(); return; }
       // a longer version of the block turned out not to be a question: keep the earlier answer
       card.status = 'done';
@@ -787,7 +813,7 @@ function welcomeEl() {
   const items = [
     ['Add your two keys', ' and paste your background in Settings.'],
     ['Laptop audio on speakers', ', phone flat on the desk near the laptop.'],
-    ['Tap Start', ' and say "testing, testing" so it knows your voice.'],
+    ['Tap Listen', ' and say "testing, testing" so it knows your voice.'],
     ['Join the call.', ' Answers appear as they ask.']
   ];
   for (const [b, rest] of items) { const li = el('li'); li.appendChild(el('b', '', b)); li.appendChild(document.createTextNode(rest)); ol.appendChild(li); }
@@ -819,19 +845,26 @@ function dgUrl() {
   return 'wss://api.deepgram.com/v1/listen?' + p.toString();
 }
 
-function connectDG() {
+let dgFails = 0;
+function scheduleReconnect() {
+  dgFails++;
+  setStatus('Reconnecting...', 'paused');
   clearTimeout(reconnectT);
+  reconnectT = setTimeout(() => { reconnectT = null; if (sess.running) connectDG(); }, Math.min(5000, 600 * dgFails));
+}
+function connectDG() {
+  clearTimeout(reconnectT); reconnectT = null;
   const conn = ++sess.conn;
   sess.frames[conn] = []; samplesSent = 0; pending = [];
   let opened = false;
   try { ws = new WebSocket(dgUrl(), ['token', S.dgKey.trim()]); }
-  catch (e) { fail('Could not open the listening connection.'); return; }
+  catch (e) { ws = null; scheduleReconnect(); return; }
   ws.binaryType = 'arraybuffer';
   const me = ws;
   ws.onopen = () => {
     if (me !== ws) return;
-    opened = true;
-    if (everConnected) banner('Reconnected. If ME / THEM labels look wrong, tap Swap.', '', 'OK');
+    opened = true; dgFails = 0;
+    if (everConnected) banner('Back on. Everything said so far is kept. If ME / THEM look wrong, tap Swap.', '', 'OK');
     everConnected = true;
     if (sess.running && !sess.paused) setStatus('Listening', 'on');
     for (const f of pending) sendFrame(f);
@@ -844,8 +877,7 @@ function connectDG() {
     ws = null;
     if (!sess.running) return;
     if (!opened && !everConnected) { fail('Deepgram refused the connection. Check the Deepgram key in Settings (and that it has credit).'); return; }
-    setStatus('Reconnecting...', 'paused');
-    reconnectT = setTimeout(() => { if (sess.running) connectDG(); }, 800);
+    scheduleReconnect();
   };
 }
 
@@ -868,7 +900,7 @@ function onDG(conn, m) {
       const role = last ? roleOf(last.conn, last.spk) : 'unk';
       if (role === 'me') {
         if (wc(last.text) >= 3) scheduleAnswer(150); // you started answering: make sure a card exists
-      } else scheduleAnswer(m.speech_final ? 450 : 1500);
+      } else scheduleAnswer(m.speech_final ? 250 : 1200);
     } else renderTranscript();
   } else if (m.type === 'UtteranceEnd') {
     const last = sess.turns[sess.turns.length - 1];
@@ -891,7 +923,9 @@ function pushFrame(f) {
   else if (pending.length < 160) pending.push(f); // up to 8 s while connecting
 }
 
+let lastAudioAt = 0, healing = false, healTries = 0, watchI = null;
 function onAudio(input, inRate) {
+  lastAudioAt = Date.now();
   // resample to 16 kHz by block averaging
   const ratio = inRate / OUT_RATE;
   const buf = new Float32Array(carry.length + input.length);
@@ -918,6 +952,14 @@ async function startAudio() {
   stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true, channelCount: 1 } });
   await resumed;
   if (ctx.state !== 'running') { try { await ctx.resume(); } catch (e) {} }
+  // notice when the phone takes the mic away (a call, another app, a headset change)
+  const myStream = stream, track = stream.getAudioTracks()[0];
+  if (track) {
+    track.onended = () => { if (stream === myStream) audioLost(); };
+    track.onmute = () => setTimeout(() => { if (stream === myStream && track.muted) audioLost(); }, 2000);
+  }
+  const myCtx = ctx;
+  ctx.onstatechange = () => { if (ctx === myCtx && sess.running && myCtx.state === 'suspended') myCtx.resume().catch(() => {}); };
   const src = ctx.createMediaStreamSource(stream);
   sinkGain = ctx.createGain(); sinkGain.gain.value = 0; sinkGain.connect(ctx.destination);
   const rate = ctx.sampleRate;
@@ -943,6 +985,30 @@ function stopAudio() {
   node = null; stream = null; ctx = null; carry = new Float32Array(0); frameFill = 0;
 }
 
+// every 1.5 s: is sound still arriving? If not, restart the mic quietly; if that fails, ask for a tap
+function watchdog() {
+  if (!sess.running || sess.paused || healing || document.hidden) return;
+  if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+  if (Date.now() - lastAudioAt > 3500) audioLost();
+  else healTries = 0;
+  if (!ws && !reconnectT) connectDG();
+}
+async function audioLost() {
+  if (healing || !sess.running || sess.paused) return;
+  if (healTries >= 2) { interrupted(); return; }
+  healing = true; healTries++;
+  setStatus('Restarting mic...', 'paused');
+  stopAudio();
+  try { await startAudio(); lastAudioAt = Date.now(); if (ws && ws.readyState === 1) setStatus('Listening', 'on'); }
+  catch (e) { healing = false; interrupted(); return; }
+  healing = false;
+}
+function interrupted() {
+  stopAll(true);
+  setStatus('Stopped', 'err');
+  banner('Listening stopped (a phone call, app switch or screen lock can do this). Tap Listen to carry on. Everything said so far is kept.', 'err', 'Listen', () => start());
+}
+
 async function keepAwake() {
   try { if ('wakeLock' in navigator && document.visibilityState === 'visible') wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
 }
@@ -950,6 +1016,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && sess.running) {
     keepAwake();
     if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+    lastAudioAt = Math.max(lastAudioAt, Date.now() - 2000); // give it a moment before the watchdog steps in
   }
 });
 
@@ -969,16 +1036,20 @@ async function start() {
   catch (e) {
     stopAudio();
     setStatus('Ready', '');
-    banner(e && e.name === 'NotAllowedError' ? 'Microphone blocked. Allow the mic for this site in your browser settings, then tap Start.' : 'Could not start the microphone: ' + (e.message || e.name), 'err');
+    banner(e && e.name === 'NotAllowedError' ? 'Microphone blocked. Allow the mic for this site in your browser settings, then tap Listen.' : 'Could not start the microphone: ' + (e.message || e.name), 'err', 'Listen', () => start());
     return;
   }
-  sess.running = true; sess.paused = false; everConnected = false;
+  sess.running = true; sess.paused = false; everConnected = false; dgFails = 0;
+  lastAudioAt = Date.now(); healTries = 0; healing = false;
   if (!sess.startedAt) sess.startedAt = Date.now();
   startTimer(); keepAwake();
   connectDG();
   clearInterval(keepI);
   keepI = setInterval(() => { if (ws && ws.readyState === 1 && sess.paused) ws.send(JSON.stringify({ type: 'KeepAlive' })); }, 5000);
-  beginCheck();
+  clearInterval(watchI); watchI = setInterval(watchdog, 1500);
+  const heardBefore = sess.turns.some((t) => typeof t.conn === 'number');
+  if (!heardBefore && sess.meRef == null) beginCheck();
+  else banner('Listening again. Everything said so far is kept.', '', 'OK');
   updateMain(); renderCards(); renderTranscript();
 }
 function beginCheck() {
@@ -995,11 +1066,12 @@ function pause() {
   if (!sess.running) return;
   sess.paused = !sess.paused;
   setStatus(sess.paused ? 'Paused' : 'Listening', sess.paused ? 'paused' : 'on');
+  if (!sess.paused) { lastAudioAt = Date.now(); healTries = 0; }
   updateMain();
 }
 function stopAll(keep) {
   sess.running = false; sess.paused = false; sess.check = null;
-  clearInterval(keepI); clearTimeout(reconnectT); clearTimeout(trigT);
+  clearInterval(keepI); clearInterval(watchI); clearTimeout(reconnectT); reconnectT = null; clearTimeout(trigT);
   if (ws) { try { ws.send(JSON.stringify({ type: 'CloseStream' })); } catch (e) {} try { ws.close(); } catch (e) {} ws = null; }
   stopAudio();
   try { if (wakeLock) wakeLock.release(); } catch (e) {}
@@ -1011,7 +1083,7 @@ function stopAll(keep) {
 function updateMain() {
   const b = $('#btnMain');
   if (sess.demo) { b.className = 'ctl pause'; b.lastElementChild.textContent = 'Stop demo'; return; }
-  if (!sess.running) { b.className = 'ctl go'; b.lastElementChild.textContent = 'Start'; }
+  if (!sess.running) { b.className = 'ctl go'; b.lastElementChild.textContent = 'Listen'; }
   else if (sess.paused) { b.className = 'ctl go'; b.lastElementChild.textContent = 'Resume'; }
   else { b.className = 'ctl pause'; b.lastElementChild.textContent = 'Pause'; }
 }
@@ -1019,8 +1091,9 @@ $('#btnMain').onclick = () => {
   if (sess.demo) { stopDemo(); return; }
   if (!sess.running) start(); else pause();
 };
-$('#btnAnswer').onclick = () => maybeAnswer(true);
+$('#btnAnswer').onclick = answerNow;
 $('#btnSwap').onclick = swap;
+$('#modeChip').onclick = () => { S.mode = S.mode === 'meeting' ? 'interview' : 'meeting'; store.set('settings', S); applyLook(); toast(S.mode === 'meeting' ? 'Meeting mode' : 'Interview mode'); };
 
 /* ---------- typed question ---------- */
 $('#btnType').onclick = () => { $('#typeWrap').classList.add('show'); setTimeout(() => $('#fAsk').focus(), 50); };
@@ -1199,7 +1272,7 @@ function stopDemo(silent) {
 }
 
 /* ---------- boot ---------- */
-window.__cc = { sess, S, onDG, maybeAnswer, latestBlock, roleOf, md, systemPrompt, userPrompt };
+window.__cc = { sess, S, onDG, maybeAnswer, latestBlock, roleOf, md, systemPrompt, userPrompt, answerNow, audioLost, watchdog };
 restore();
 renderCards(); renderTranscript(); updateMain();
 if (!S.dgKey && !S.anKey && !sess.cards.length) setTimeout(() => { if (!sess.demo && !sess.running) openSettings(); }, 400);
