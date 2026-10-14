@@ -1,0 +1,1209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" content="#0d0e11">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Copilot">
+<title>Call Copilot</title>
+<style>
+:root{
+  --bg:#0d0e11; --panel:#15171c; --panel2:#1c1f26; --line:#2a2e37;
+  --text:#eceef2; --muted:#9aa1ad; --dim:#666c78;
+  --me:#7fa8ec; --them:#e8b86d; --unk:#8d93a0;
+  --ok:#73c69c; --warn:#e8b86d; --bad:#e57373;
+  --fs:19px;
+  --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text)}
+body{font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input,textarea,select{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+textarea{resize:vertical;min-height:92px}
+a{color:var(--me)}
+.app{display:flex;flex-direction:column;height:100dvh;height:100vh;height:100dvh}
+
+/* header */
+.bar{display:flex;align-items:center;gap:10px;padding:calc(var(--safe-t) + 10px) 14px 10px;border-bottom:1px solid var(--line);background:var(--bg)}
+.status{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--dim);flex:none}
+.dot.on{background:var(--ok);animation:pulse 1.6s infinite}
+.dot.paused{background:var(--warn)}
+.dot.err{background:var(--bad)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(115,198,156,.55)}70%{box-shadow:0 0 0 9px rgba(115,198,156,0)}100%{box-shadow:0 0 0 0 rgba(115,198,156,0)}}
+#statusText{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#timer{color:var(--muted);font-variant-numeric:tabular-nums;font-size:14px}
+.chip{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.iconbtn{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:var(--muted)}
+.iconbtn:active{background:var(--panel2)}
+.iconbtn svg{width:22px;height:22px}
+
+/* banner */
+.banner{margin:10px 14px 0;padding:12px 14px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);font-size:15px;display:none;gap:10px;align-items:flex-start}
+.banner.show{display:flex}
+.banner.err{border-color:rgba(229,115,115,.5)}
+.banner.check{border-color:rgba(127,168,236,.55)}
+.banner .msg{flex:1}
+.banner button{color:var(--me);font-weight:600;font-size:14px;padding:2px 4px;white-space:nowrap}
+
+/* cards */
+#cards{flex:1;overflow-y:auto;padding:12px 14px 18px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px 12px;margin-bottom:12px}
+.card.latest{border-color:#3a414d}
+.card-q{display:flex;gap:8px;align-items:flex-start;color:var(--muted);font-size:15px;line-height:1.4;margin-bottom:10px}
+.card-q .qt{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card.open .card-q .qt{-webkit-line-clamp:unset;display:block}
+.who{flex:none;font-size:11px;font-weight:700;letter-spacing:.05em;padding:3px 7px;border-radius:6px;margin-top:1px}
+.who.them{background:rgba(232,184,109,.14);color:var(--them)}
+.who.me{background:rgba(127,168,236,.14);color:var(--me)}
+.who.unk{background:rgba(141,147,160,.14);color:var(--unk)}
+.who.you{background:rgba(115,198,156,.14);color:var(--ok)}
+.card-a{font-size:var(--fs);line-height:1.5}
+.card-a p{margin:0 0 .55em}
+.card-a ul{margin:.2em 0 .6em;padding-left:1.1em}
+.card-a li{margin:.15em 0}
+.card-a h4{margin:.6em 0 .3em;font-size:.82em;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.card-a strong{color:#fff}
+.card-a code{font:0.82em/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel2);padding:1px 5px;border-radius:5px}
+.card-a pre{background:#0a0b0e;border:1px solid var(--line);border-radius:10px;padding:10px 12px;overflow-x:auto;margin:.4em 0 .7em;font-size:max(13px,calc(var(--fs)*.72));line-height:1.45}
+.card-a pre code{background:none;padding:0;font-size:1em;line-height:inherit;white-space:pre}
+.card.old .card-a{max-height:5.2em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
+.card.old.open .card-a{max-height:none;-webkit-mask-image:none;mask-image:none}
+.card.old{opacity:.78}
+.card-meta{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:6px;font-size:12.5px;color:var(--dim)}
+.card-meta button{color:var(--muted);font-size:12.5px;padding:4px 0}
+.thinking{display:inline-flex;gap:4px;align-items:center;color:var(--muted);font-size:15px}
+.thinking i{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:blink 1.2s infinite}
+.thinking i:nth-child(2){animation-delay:.2s}.thinking i:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+.stale{opacity:.55}
+
+/* welcome */
+.welcome{padding:6px 2px}
+.welcome h1{font-size:24px;line-height:1.2;margin:6px 0 6px}
+.welcome p{color:var(--muted);margin:0 0 14px}
+.steps{list-style:none;padding:0;margin:0 0 18px;counter-reset:s}
+.steps li{counter-increment:s;position:relative;padding:10px 0 10px 40px;border-top:1px solid var(--line);font-size:15.5px}
+.steps li::before{content:counter(s);position:absolute;left:0;top:10px;width:26px;height:26px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);display:grid;place-items:center;font-size:13px;font-weight:700;color:var(--muted)}
+.steps b{color:#fff}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.btn{padding:12px 16px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);font-weight:600;font-size:15px}
+.btn.primary{background:var(--text);color:var(--bg);border-color:var(--text)}
+.btn:active{transform:scale(.98)}
+
+/* live strip */
+.live{border-top:1px solid var(--line);background:var(--panel)}
+.live-head{display:flex;align-items:center;justify-content:space-between;width:100%;padding:8px 14px 2px;color:var(--dim);font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.live-head svg{width:16px;height:16px;transition:transform .2s}
+.live.expanded .live-head svg{transform:rotate(180deg)}
+#transcript{max-height:5.4em;overflow:hidden;padding:2px 14px 8px;font-size:14.5px;line-height:1.45;display:flex;flex-direction:column;justify-content:flex-end;-webkit-mask-image:linear-gradient(transparent,#000 38%);mask-image:linear-gradient(transparent,#000 38%)}
+.live.expanded #transcript{-webkit-mask-image:none;mask-image:none}
+.live.expanded #transcript{max-height:46vh;overflow-y:auto;justify-content:flex-start}
+.line{display:flex;gap:8px;align-items:flex-start;padding:3px 0}
+.line .tx{flex:1;color:#d6d9df;min-width:0;overflow-wrap:anywhere}
+.line.interim .tx{color:var(--muted);font-style:italic}
+.line .who{cursor:pointer}
+.line .ans{flex:none;font-size:12px;color:var(--them);border:1px solid rgba(232,184,109,.35);border-radius:7px;padding:2px 7px;display:none}
+.live.expanded .line .ans{display:inline-block}
+.live.expanded .line.me .ans{display:none}
+.hint{color:var(--dim);font-size:13px;padding:2px 0 4px}
+
+/* controls */
+.controls{display:grid;grid-template-columns:1.25fr 1.25fr 1fr 1fr;gap:8px;padding:10px 12px calc(var(--safe-b) + 10px);background:var(--panel);border-top:1px solid var(--line)}
+.ctl{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;border-radius:14px;background:var(--panel2);border:1px solid var(--line);font-size:12.5px;font-weight:600;color:#d6d9df}
+.ctl svg{width:22px;height:22px}
+.ctl.go{background:var(--text);color:var(--bg);border-color:var(--text)}
+.ctl.pause{background:rgba(232,184,109,.12);border-color:rgba(232,184,109,.45);color:var(--them)}
+.ctl:active{transform:scale(.97)}
+.ctl[disabled]{opacity:.4}
+
+/* sheets */
+.sheet-wrap{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;z-index:20}
+.sheet-wrap.show{display:block}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-height:92vh;max-height:92dvh;overflow-y:auto;background:var(--panel);border-top-left-radius:20px;border-top-right-radius:20px;padding:8px 16px calc(var(--safe-b) + 18px);border-top:1px solid var(--line)}
+.grab{width:42px;height:5px;border-radius:3px;background:var(--line);margin:4px auto 10px}
+.sheet h2{font-size:20px;margin:4px 0 4px}
+.sheet h3{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:22px 0 8px}
+.field{margin:10px 0}
+.field label{display:block;font-size:14px;font-weight:600;margin-bottom:6px}
+.field .help{font-size:13px;color:var(--dim);margin-top:5px}
+.seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:3px;gap:3px}
+.seg button{flex:1;padding:9px 6px;border-radius:8px;font-size:14px;font-weight:600;color:var(--muted)}
+.seg button.sel{background:var(--text);color:var(--bg)}
+.sheet .actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.sheet .actions .btn{flex:1}
+.small{font-size:13px;color:var(--dim)}
+.howto{font-size:14.5px;color:var(--muted)}
+.howto li{margin:4px 0}
+.toast{position:fixed;left:50%;bottom:calc(var(--safe-b) + 92px);transform:translateX(-50%);background:#24282f;border:1px solid var(--line);color:var(--text);padding:9px 14px;border-radius:10px;font-size:14px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+.typebox{display:flex;gap:8px;margin-top:6px}
+.typebox input{flex:1}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="bar">
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">Ready</span><span id="timer"></span></div>
+    <span class="chip" id="modeChip">Interview</span>
+    <button class="iconbtn" id="btnSettings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </header>
+
+  <div class="banner" id="banner"><div class="msg" id="bannerMsg"></div><button id="bannerBtn"></button></div>
+
+  <main id="cards"></main>
+
+  <section class="live" id="live">
+    <button class="live-head" id="liveHead"><span id="liveLabel">Live transcript</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 15l6-6 6 6"/></svg>
+    </button>
+    <div id="transcript"><div class="hint">Nothing heard yet.</div></div>
+  </section>
+
+  <nav class="controls">
+    <button class="ctl go" id="btnMain">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      <span>Start</span>
+    </button>
+    <button class="ctl" id="btnAnswer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>
+      <span>Answer now</span>
+    </button>
+    <button class="ctl" id="btnSwap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>
+      <span>Swap</span>
+    </button>
+    <button class="ctl" id="btnType">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>
+      <span>Type</span>
+    </button>
+  </nav>
+</div>
+
+<!-- Settings -->
+<div class="sheet-wrap" id="settingsWrap">
+  <div class="sheet" role="dialog" aria-label="Settings">
+    <div class="grab"></div>
+    <h2>Set up</h2>
+    <div class="small">Everything here stays on this phone only.</div>
+
+    <h3>Mode</h3>
+    <div class="seg" id="segMode"><button data-v="interview">Interview</button><button data-v="meeting">Meeting</button></div>
+
+    <h3>You</h3>
+    <div class="field"><label for="fName">Your name</label><input id="fName" autocomplete="off" placeholder="e.g. Chitranshu"></div>
+    <div class="field"><label for="fAbout">About you</label><textarea id="fAbout" rows="7" placeholder="Paste your CV, key projects, numbers you are proud of, stories you like to tell, tools you know."></textarea>
+      <div class="help">Answers are built only from this. Anything missing shows up as [add example].</div></div>
+
+    <h3>This call</h3>
+    <div class="field"><label for="fCall">What is this call about?</label><textarea id="fCall" rows="5" placeholder="Company, role, job description, who you are meeting, agenda, anything you want stressed."></textarea></div>
+    <div class="field"><label for="fTerms">Tricky words to recognise</label><input id="fTerms" autocomplete="off" placeholder="e.g. Kubernetes, Graviton, IPMI, Prometheus">
+      <div class="help">Comma separated. Helps the listener spell names and tech terms right (English mode).</div></div>
+
+    <h3>Answers</h3>
+    <div class="field"><label>Length</label><div class="seg" id="segLen"><button data-v="short">Short</button><button data-v="medium">Medium</button><button data-v="long">Detailed</button></div></div>
+    <div class="field"><label>Language heard</label><div class="seg" id="segLang"><button data-v="en">English</button><button data-v="multi">English + Hindi</button></div></div>
+    <div class="field"><label for="fModel">Brain</label>
+      <select id="fModel">
+        <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (balanced)</option>
+        <option value="claude-haiku-5-5">Claude Haiku 5.5 (fastest)</option>
+        <option value="claude-opus-5-5">Claude Opus 5.5 (deepest, slower)</option>
+      </select></div>
+    <div class="field"><label for="fSize">Answer text size</label><input id="fSize" type="range" min="15" max="26" step="1"></div>
+
+    <h3>Keys</h3>
+    <div class="field"><label for="fDg">Deepgram key (the ears)</label><input id="fDg" type="password" autocomplete="off" spellcheck="false" placeholder="Paste key">
+      <div class="help">Free sign-up with starting credit at <a href="https://console.deepgram.com/signup" target="_blank" rel="noopener">console.deepgram.com</a>, then API Keys, Create key.</div></div>
+    <div class="field"><label for="fAn">Anthropic key (the brain)</label><input id="fAn" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
+      <div class="help">From <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>, API Keys. Needs a little prepaid credit.</div></div>
+
+    <div class="actions">
+      <button class="btn primary" id="btnSave">Save</button>
+      <button class="btn" id="btnDemo">Try demo</button>
+    </div>
+
+    <h3>Session</h3>
+    <div class="actions" style="margin-top:4px">
+      <button class="btn" id="btnCopy">Copy notes</button>
+      <button class="btn" id="btnEnd">End and clear</button>
+    </div>
+
+    <h3>How to use</h3>
+    <ol class="howto">
+      <li>Laptop call audio on <b>speakers</b>, not headphones. The phone has to hear them.</li>
+      <li>Phone flat on the desk between you and the laptop, screen up, this page open.</li>
+      <li>Tap <b>Start</b> before the call and say "testing, testing" so it learns which voice is you.</li>
+      <li>Questions from the other side get an answer card on top. Follow-ups get a new card.</li>
+      <li>Labels wrong? Tap <b>Swap</b>, or tap a ME / THEM label in the transcript.</li>
+      <li>Missed one? <b>Answer now</b> answers the latest thing they said. <b>Type</b> lets you ask privately.</li>
+      <li>Keep this screen open. Phones stop the mic when you switch apps or lock the screen.</li>
+    </ol>
+    <div class="actions"><button class="btn" id="btnClose">Close</button></div>
+  </div>
+</div>
+
+<!-- Type -->
+<div class="sheet-wrap" id="typeWrap">
+  <div class="sheet" role="dialog" aria-label="Ask privately">
+    <div class="grab"></div>
+    <h2>Ask privately</h2>
+    <div class="small">Only you see this. The call context is included.</div>
+    <div class="typebox"><input id="fAsk" autocomplete="off" placeholder="e.g. give me a stronger example for that"><button class="btn primary" id="btnAsk">Ask</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- storage (safe) ---------- */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('cc.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('cc.' + k, JSON.stringify(v)); } catch (e) {} },
+  del(k) { try { localStorage.removeItem('cc.' + k); } catch (e) {} }
+};
+
+const DEFAULTS = { dgKey: '', anKey: '', mode: 'interview', name: '', about: '', call: '', terms: '', length: 'short', lang: 'en', model: 'claude-sonnet-5-5', fs: 19 };
+let S = Object.assign({}, DEFAULTS, store.get('settings', {}));
+
+/* ---------- dom ---------- */
+const $ = (s) => document.querySelector(s);
+const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+const cardsEl = $('#cards'), trEl = $('#transcript');
+
+/* ---------- session state ---------- */
+const sess = {
+  conn: 0,
+  maps: {},        // conn -> { me: speakerId|null, src: 'check'|'user'|'auto'|null }
+  stats: {},       // conn -> { spk: {sum, n} }  (word loudness in dB)
+  frames: {},      // conn -> array of rms per 50 ms frame (index = frame number)
+  turns: [],       // { id, conn, spk, text, start, end }
+  interim: null,   // { conn, spk, text }
+  cards: [],       // { id, blockId, q, text, status, gen, ctrl, t0, manual }
+  meRef: null, themRef: null,  // loudness references carried across reconnects
+  check: null,     // voice check state
+  startedAt: 0,
+  demo: false
+};
+let nextId = 1;
+
+/* ---------- small ui helpers ---------- */
+let toastT;
+function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms); }
+let bannerAction = null;
+function banner(msg, kind = '', btnText = '', action = null) {
+  const b = $('#banner');
+  if (!msg) { b.className = 'banner'; bannerAction = null; return; }
+  $('#bannerMsg').textContent = msg;
+  const bb = $('#bannerBtn'); bb.textContent = btnText; bb.style.display = btnText ? '' : 'none';
+  bannerAction = action; b.className = 'banner show ' + kind;
+}
+$('#bannerBtn').onclick = () => { const a = bannerAction; banner(''); if (a) a(); };
+
+function setStatus(text, state) {
+  $('#statusText').textContent = text;
+  $('#dot').className = 'dot' + (state ? ' ' + state : '');
+}
+function applyLook() {
+  document.documentElement.style.setProperty('--fs', S.fs + 'px');
+  $('#modeChip').textContent = S.mode === 'meeting' ? 'Meeting' : 'Interview';
+}
+applyLook();
+
+let timerI = null;
+function startTimer() {
+  clearInterval(timerI);
+  timerI = setInterval(() => {
+    if (!sess.startedAt) { $('#timer').textContent = ''; return; }
+    const s = Math.floor((Date.now() - sess.startedAt) / 1000);
+    $('#timer').textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  }, 1000);
+}
+
+/* ---------- markdown (escaped, minimal) ---------- */
+const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function inl(s) {
+  return esc(s)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+}
+function mdBlocks(t) {
+  let out = '', para = [], list = [];
+  const flushP = () => { if (para.length) { out += '<p>' + para.map(inl).join('<br>') + '</p>'; para = []; } };
+  const flushL = () => { if (list.length) { out += '<ul>' + list.map((x) => '<li>' + inl(x) + '</li>').join('') + '</ul>'; list = []; } };
+  for (const raw of t.split('\n')) {
+    const line = raw.replace(/\s+$/, '');
+    const li = line.match(/^\s*(?:[-*\u2022]|\d+[.)])\s+(.*)$/);
+    const h = line.match(/^\s*#{1,6}\s+(.*)$/);
+    if (!line.trim()) { flushP(); flushL(); }
+    else if (h) { flushP(); flushL(); out += '<h4>' + inl(h[1]) + '</h4>'; }
+    else if (li) { flushP(); list.push(li[1]); }
+    else { flushL(); para.push(line); }
+  }
+  flushP(); flushL();
+  return out;
+}
+function md(src) {
+  const parts = src.split('```');
+  let html = '';
+  parts.forEach((p, i) => {
+    if (i % 2 === 1) {
+      const nl = p.indexOf('\n');
+      const code = nl >= 0 ? p.slice(nl + 1) : '';
+      html += '<pre><code>' + esc(code.replace(/\n$/, '')) + '</code></pre>';
+    } else html += mdBlocks(p);
+  });
+  return html;
+}
+
+/* ---------- speakers ---------- */
+function mapFor(conn) { return sess.maps[conn] || (sess.maps[conn] = { me: null, src: null }); }
+function roleOf(conn, spk) {
+  if (conn === 'typed') return 'you';
+  const m = sess.maps[conn];
+  if (!m || m.me == null || spk == null) return 'unk';
+  return spk === m.me ? 'me' : 'them';
+}
+const LABEL = { me: 'ME', them: 'THEM', unk: '?', you: 'YOU' };
+const avgDb = (st) => st.sum / Math.max(1, st.n);
+
+function wordLoud(conn, s, e) {
+  const fr = sess.frames[conn]; if (!fr || !fr.length) return null;
+  const a = Math.max(0, Math.floor(s / 0.05)), b = Math.min(fr.length - 1, Math.ceil(e / 0.05));
+  if (b < a) return null;
+  let sum = 0, n = 0;
+  for (let i = a; i <= b; i++) { sum += fr[i]; n++; }
+  if (!n) return null;
+  return 20 * Math.log10(Math.max(1e-5, sum / n));
+}
+
+function autoResolve(conn) {
+  const m = mapFor(conn);
+  if (m.me != null) return;
+  const st = sess.stats[conn] || {};
+  const spks = Object.keys(st).map(Number).filter((k) => st[k].n >= 6);
+  if (!spks.length) return;
+  // carry over from an earlier connection: nearest loudness reference
+  if (sess.meRef != null && sess.themRef != null && Math.abs(sess.meRef - sess.themRef) >= 2) {
+    for (const k of spks) {
+      const d = avgDb(st[k]);
+      if (Math.abs(d - sess.meRef) + 1 < Math.abs(d - sess.themRef)) { setMe(conn, k, 'auto', true); return; }
+    }
+  }
+  if (spks.length >= 2 && spks.every((k) => st[k].n >= 10)) {
+    spks.sort((a, b) => avgDb(st[b]) - avgDb(st[a]));
+    if (avgDb(st[spks[0]]) - avgDb(st[spks[1]]) >= 3) setMe(conn, spks[0], 'auto', true);
+  }
+}
+
+function setMe(conn, spk, src, quiet) {
+  const m = mapFor(conn);
+  m.me = spk; m.src = src;
+  updateRefs(conn);
+  renderTranscript();
+  if (!quiet) toast(spk == null ? 'Cleared which voice is you' : 'Got it, that voice is you');
+  else if (src === 'auto') toast('Picked your voice automatically. Tap Swap if wrong.');
+}
+function updateRefs(conn) {
+  const m = sess.maps[conn], st = sess.stats[conn] || {};
+  if (!m || m.me == null) return;
+  const me = st[m.me]; if (me && me.n >= 4) sess.meRef = avgDb(me);
+  let sum = 0, n = 0;
+  for (const k of Object.keys(st)) if (Number(k) !== m.me) { sum += st[k].sum; n += st[k].n; }
+  if (n >= 4) sess.themRef = sum / n;
+}
+
+function speakersIn(conn) {
+  const set = new Set();
+  for (const t of sess.turns) if (t.conn === conn && t.spk != null) set.add(t.spk);
+  return [...set];
+}
+function swap() {
+  const conn = sess.conn;
+  const spks = speakersIn(conn);
+  const m = mapFor(conn);
+  if (!spks.length) { toast('Nobody heard yet'); return; }
+  if (m.me == null) { setMe(conn, spks[0], 'user'); return; }
+  const others = spks.filter((s) => s !== m.me);
+  if (others.length === 1) setMe(conn, others[0], 'user');
+  else if (others.length === 0) setMe(conn, null, 'user');
+  else {
+    // several other voices: pick the one who spoke most recently that is not me
+    const last = [...sess.turns].reverse().find((t) => t.conn === conn && t.spk !== m.me);
+    setMe(conn, last ? last.spk : others[0], 'user');
+  }
+  sess.meRef = sess.themRef = null; updateRefs(conn);
+}
+function toggleLine(turn) {
+  if (turn.conn === 'typed' || turn.conn === 'old') return;
+  const m = mapFor(turn.conn);
+  if (m.me === turn.spk) {
+    const others = speakersIn(turn.conn).filter((s) => s !== turn.spk);
+    setMe(turn.conn, others.length === 1 ? others[0] : null, 'user');
+  } else setMe(turn.conn, turn.spk, 'user');
+  sess.meRef = sess.themRef = null; updateRefs(turn.conn);
+}
+
+/* ---------- transcript ---------- */
+function ingestFinal(conn, words) {
+  // group consecutive words by speaker
+  const runs = [];
+  for (const w of words) {
+    const spk = (w.speaker == null ? 0 : w.speaker);
+    const txt = w.punctuated_word || w.word || '';
+    const db = wordLoud(conn, w.start, w.end);
+    if (db != null) {
+      const st = (sess.stats[conn] = sess.stats[conn] || {});
+      const s = (st[spk] = st[spk] || { sum: 0, n: 0 });
+      s.sum += db; s.n++;
+    }
+    const r = runs[runs.length - 1];
+    if (r && r.spk === spk) { r.text += ' ' + txt; r.end = w.end; r.words.push(txt); }
+    else runs.push({ spk, text: txt, start: w.start, end: w.end, words: [txt] });
+  }
+  for (const r of runs) {
+    // voice check: who says "testing"?
+    if (sess.check && sess.check.conn === conn) {
+      const hits = r.words.filter((x) => /test/i.test(x)).length;
+      if (hits) {
+        sess.check.votes[r.spk] = (sess.check.votes[r.spk] || 0) + hits;
+        if (sess.check.votes[r.spk] >= 1) finishCheck(conn, r.spk);
+      }
+    }
+    const last = sess.turns[sess.turns.length - 1];
+    if (last && last.conn === conn && last.spk === r.spk && r.start - last.end < 6) {
+      last.text += ' ' + r.text; last.end = r.end;
+    } else {
+      sess.turns.push({ id: nextId++, conn, spk: r.spk, text: r.text, start: r.start, end: r.end });
+    }
+  }
+  if (sess.turns.length > 600) sess.turns.splice(0, sess.turns.length - 600);
+  autoResolve(conn);
+  renderTranscript();
+  saveSoon();
+}
+
+function renderTranscript() {
+  const expanded = $('#live').classList.contains('expanded');
+  const list = expanded ? sess.turns.slice(-80) : sess.turns.slice(-3);
+  trEl.textContent = '';
+  if (!list.length && !sess.interim) { trEl.appendChild(el('div', 'hint', sess.running ? 'Listening...' : 'Nothing heard yet.')); return; }
+  for (const t of list) trEl.appendChild(lineEl(t, false));
+  if (sess.interim && sess.interim.text) trEl.appendChild(lineEl(sess.interim, true));
+  if (expanded) trEl.scrollTop = trEl.scrollHeight;
+}
+function lineEl(t, interim) {
+  const role = roleOf(t.conn, t.spk);
+  const d = el('div', 'line ' + role + (interim ? ' interim' : ''));
+  const w = el('span', 'who ' + role, LABEL[role]);
+  if (!interim && t.conn !== 'typed' && t.conn !== 'old') { w.title = 'Tap to fix who this is'; w.onclick = (e) => { e.stopPropagation(); toggleLine(t); }; }
+  d.appendChild(w);
+  d.appendChild(el('span', 'tx', t.text));
+  if (!interim && role !== 'me' && t.conn !== 'typed') {
+    const a = el('button', 'ans', 'Answer');
+    a.onclick = (e) => { e.stopPropagation(); answerText(t.text, 'line-' + t.id); };
+    d.appendChild(a);
+  }
+  return d;
+}
+$('#liveHead').onclick = () => { $('#live').classList.toggle('expanded'); renderTranscript(); };
+
+/* ---------- question detection ---------- */
+const wc = (s) => (s.trim().match(/\S+/g) || []).length;
+let trigT = null;
+function scheduleAnswer(ms) { clearTimeout(trigT); trigT = setTimeout(() => maybeAnswer(false), ms); }
+
+// Latest block of THEM speech: skip trailing ME talk, then collect THEM turns
+// until a real ME turn (3+ words). Short "mm", "yeah" from ME do not split a question.
+// While nobody is marked as ME yet, a block is the latest speaker's own run of turns.
+function latestBlock() {
+  const T = sess.turns;
+  let i = T.length - 1;
+  while (i >= 0 && (T[i].conn === 'typed' || roleOf(T[i].conn, T[i].spk) === 'me')) i--;
+  if (i < 0) return null;
+  const owner = T[i], ownerRole = roleOf(owner.conn, owner.spk);
+  const parts = []; let first = owner;
+  for (; i >= 0; i--) {
+    const t = T[i];
+    if (t.conn === 'typed') break;
+    if (ownerRole === 'unk') {
+      if (!(t.conn === owner.conn && t.spk === owner.spk)) { if (wc(t.text) >= 3) break; continue; }
+    } else if (roleOf(t.conn, t.spk) === 'me') { if (wc(t.text) >= 3) break; continue; }
+    parts.unshift(t.text); first = t;
+  }
+  return { blockId: 'b' + first.id, text: parts.join(' ') };
+}
+
+function newCard(blockId, qStart, q, show, typed) {
+  const c = { id: nextId++, blockId, qStart, q, text: '', status: 'wait', gen: 0, pending: !show, typed: !!typed, created: Date.now() };
+  sess.cards.push(c); runCard(c); renderCards(true);
+  return c;
+}
+function maybeAnswer(force) {
+  if (sess.check && !force) return;
+  const b = latestBlock();
+  if (!b) { if (force) toast('Nothing from them yet'); return; }
+  // a block can hold several questions if ME stays quiet; each gets its own card
+  const segs = sess.cards.filter((c) => c.blockId === b.blockId).sort((x, y) => (x.qStart || 0) - (y.qStart || 0));
+  const card = segs[segs.length - 1];
+  if (!card) {
+    if (!force && wc(b.text) < 3) return;
+    newCard(b.blockId, 0, b.text, !!force); return;
+  }
+  const base = b.text.slice(card.qStart || 0);
+  const seg = base.trim();
+  if (seg === card.q) { if (force) { card.hidden = false; card.pending = false; runCard(card); renderCards(true); } return; }
+  const settled = card.status === 'done' && !card.hidden && Date.now() - (card.updatedAt || 0) > 6000;
+  if (settled) {
+    const at = base.indexOf(card.q);
+    const start = (card.qStart || 0) + (at >= 0 ? at : 0) + card.q.length;
+    const rest = b.text.slice(start).trim();
+    if (!rest || (!force && wc(rest) < 3)) return;
+    newCard(b.blockId, start, rest, !!force); return;
+  }
+  if (!force && !card.hidden && card.status !== 'noq' && wc(seg) - wc(card.q) < 3) return;
+  card.q = seg;
+  if (card.hidden) { card.hidden = false; card.pending = !force; }
+  runCard(card); renderCards();
+}
+function answerText(text, blockId, typed) {
+  const c = sess.cards.find((x) => x.blockId === blockId);
+  if (!c) { newCard(blockId, 0, text, true, typed); return; }
+  c.q = text; c.hidden = false; c.pending = false;
+  runCard(c); renderCards(true);
+}
+function updateThinking() {
+  const busy = sess.cards.some((c) => !c.hidden && (c.status === 'wait' || c.status === 'update' || c.status === 'stream'));
+  $('#liveLabel').textContent = busy ? 'Live transcript · thinking' : 'Live transcript';
+}
+
+/* ---------- claude ---------- */
+function systemPrompt() {
+  const name = S.name.trim() || 'the user';
+  const len = {
+    short: 'Keep the part to say to 2 to 4 sentences, about 20 seconds out loud.',
+    medium: 'Keep the part to say to 4 to 6 sentences, about 40 seconds out loud.',
+    long: 'The part to say can run to 8 sentences, with clear structure if the question needs it.'
+  }[S.length] || '';
+  const mode = S.mode === 'meeting'
+    ? `This is a work meeting. Help ME respond well: what to say, plus the facts, numbers, code or concept they asked for. If THEM assign ME an action, end with a line "Action:" and the action. Prefer short bullets when ME needs to give several points.`
+    : `This is a job interview. Help ME answer like a strong candidate: direct, structured, specific, honest about limits.`;
+  return `You are a live call copilot running on ${name}'s phone. You receive a live, automatic speech transcript of a call. Lines marked ME are ${name}. Lines marked THEM are the other person or people. Lines marked ? are not yet attributed; work out from the content who is talking. Expect misheard words and fix them in your head.
+
+Your job: when THEM ask ME something, write what ME should say back right now. ME will glance at the phone and say it in their own voice, so it must read naturally out loud.
+
+${mode}
+
+How to write:
+- Write as ME, first person, plain spoken English with UK spelling. No filler, no "Great question", never use em dashes.
+- First sentence is the direct answer. ${len}
+- After that, only if useful, a line "If they probe:" followed by 2 or 3 short bullets of extra depth.
+- Ground everything in ME's background below. Never invent employers, dates, numbers, clients or projects. If a specific is needed and it is not in the background, write [add example] or [number].
+- Stay consistent with what ME has already said on this call. A follow-up question builds on the earlier answer.
+- Concept question: plain definition, then one concrete example.
+- Coding task: one line of approach, then a code block in the language they asked for (Python if not said), then one line with time and space complexity.
+- Behavioural question: a short story from the background in situation, action, result order.
+- Use **bold** sparingly for the 2 or 3 words ME must not miss.
+- If the newest THEM speech is not asking ME anything (small talk, an acknowledgement, they are still setting up the question, or it is really ME talking), reply with exactly NOQ and nothing else.
+
+ME's background:
+<background>
+${S.about.trim() || '(not provided)'}
+</background>
+
+About this call:
+<call>
+${S.call.trim() || '(not provided)'}
+</call>`;
+}
+function transcriptText(maxChars = 9000) {
+  const lines = [];
+  for (const t of sess.turns) {
+    if (t.conn === 'typed') continue;
+    lines.push(LABEL[roleOf(t.conn, t.spk)] + ': ' + t.text);
+  }
+  let s = lines.join('\n');
+  if (s.length > maxChars) s = '...\n' + s.slice(-maxChars);
+  return s || '(nothing yet)';
+}
+function userPrompt(card) {
+  if (card.typed) return `Live transcript so far (oldest first):\n${transcriptText()}\n\nME is asking you privately (THEM cannot see this): "${card.q}"\n\nAnswer ME directly and briefly. Do not reply NOQ.`;
+  return `Live transcript so far (oldest first):\n${transcriptText()}\n\nNewest from THEM: "${card.q}"\n\nWrite what ME should say now, or NOQ.`;
+}
+
+async function streamClaude(card, onText) {
+  const body = {
+    model: S.model, max_tokens: 1200, stream: true,
+    system: [{ type: 'text', text: systemPrompt(), cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: userPrompt(card) }]
+  };
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST', signal: card.ctrl.signal,
+    headers: { 'content-type': 'application/json', 'x-api-key': S.anKey.trim(), 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    let msg = 'Error ' + res.status;
+    try { const j = await res.json(); if (j && j.error && j.error.message) msg = j.error.message; } catch (e) {}
+    const err = new Error(msg); err.status = res.status; throw err;
+  }
+  const reader = res.body.getReader(), dec = new TextDecoder();
+  let buf = '', text = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf('\n\n')) >= 0) {
+      const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
+      for (const line of chunk.split('\n')) {
+        if (!line.startsWith('data:')) continue;
+        const data = line.slice(5).trim(); if (!data) continue;
+        let ev; try { ev = JSON.parse(data); } catch (e) { continue; }
+        if (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta') { text += ev.delta.text; onText(text); }
+        else if (ev.type === 'error') throw new Error((ev.error && ev.error.message) || 'Stream error');
+      }
+    }
+  }
+  return text;
+}
+
+async function runCard(card) {
+  if (card.ctrl) { try { card.ctrl.abort(); } catch (e) {} }
+  const gen = ++card.gen;
+  card.ctrl = new AbortController();
+  card.status = card.text ? 'update' : 'wait';
+  card.t0 = performance.now(); card.updatedAt = Date.now();
+  const onText = (t) => {
+    if (gen !== card.gen) return;
+    const trimmed = t.trim();
+    if (!card.typed && (/^N(O(Q)?)?$/.test(trimmed) || trimmed.startsWith('NOQ'))) return; // might be NOQ, hold
+    card.text = t; card.status = 'stream';
+    if (card.pending) { card.pending = false; renderCards(true); }
+    else paintCard(card);
+    updateThinking();
+  };
+  const showError = (msg) => {
+    card.status = 'error'; card.err = msg;
+    if (card.pending) { card.pending = false; renderCards(true); } else paintCard(card);
+    updateThinking();
+  };
+  paintCard(card); updateThinking();
+  try {
+    let full;
+    if (sess.demo && !S.anKey.trim()) full = await demoAnswer(card, onText);
+    else {
+      if (!S.anKey.trim()) { showError('Add your Anthropic key in Settings to get answers.'); return; }
+      try { full = await streamClaude(card, onText); }
+      catch (e) {
+        if (e.name === 'AbortError') throw e;
+        if (e.status === 429 || e.status === 529 || e.status >= 500) { await sleep(1200); if (gen !== card.gen) return; full = await streamClaude(card, onText); }
+        else throw e;
+      }
+    }
+    if (gen !== card.gen) return;
+    if (!card.typed && full.trim().startsWith('NOQ')) {
+      if (!card.text) { card.status = 'noq'; card.hidden = true; card.pending = false; renderCards(); updateThinking(); return; }
+      // a longer version of the block turned out not to be a question: keep the earlier answer
+      card.status = 'done';
+    } else { card.text = full; card.status = 'done'; card.ms = Math.round(performance.now() - card.t0); }
+    card.updatedAt = Date.now();
+    if (card.pending) { card.pending = false; renderCards(true); } else paintCard(card);
+    updateThinking(); saveSoon();
+  } catch (e) {
+    if (e.name === 'AbortError' || gen !== card.gen) return;
+    let msg = e.status === 401 ? 'Anthropic key rejected. Check it in Settings.' : (e.message || 'Could not reach Claude.');
+    if (/fetch|network|Load failed/i.test(msg)) msg = 'No connection to Claude. Check the internet on this phone.';
+    showError(msg);
+  }
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* ---------- cards ui ---------- */
+function visibleCards() { return sess.cards.filter((c) => !c.hidden && !(c.pending && !c.text)); }
+function renderCards(scrollTop) {
+  const vis = visibleCards();
+  cardsEl.textContent = '';
+  if (!vis.length) { cardsEl.appendChild(welcomeEl()); return; }
+  const ordered = [...vis].sort((a, b) => b.id - a.id);
+  ordered.forEach((c, i) => {
+    const a = el('article', 'card ' + (i === 0 ? 'latest open' : 'old'));
+    a.dataset.id = c.id;
+    const q = el('div', 'card-q');
+    q.appendChild(el('span', 'who ' + (c.typed ? 'you' : 'them'), c.typed ? 'YOU' : 'THEM'));
+    q.appendChild(el('span', 'qt', c.q));
+    a.appendChild(q);
+    const body = el('div', 'card-a'); a.appendChild(body);
+    const meta = el('div', 'card-meta'); a.appendChild(meta);
+    if (i > 0) a.onclick = () => a.classList.toggle('open');
+    cardsEl.appendChild(a);
+    c.node = a;
+    paintCard(c);
+  });
+  if (scrollTop) cardsEl.scrollTop = 0;
+}
+function paintCard(c) {
+  const a = c.node; if (!a || !a.isConnected) return;
+  const body = a.querySelector('.card-a'), meta = a.querySelector('.card-meta');
+  a.querySelector('.qt').textContent = c.q;
+  if (c.status === 'wait' && !c.text) {
+    body.innerHTML = '<span class="thinking"><i></i><i></i><i></i>&nbsp;Thinking</span>';
+  } else if (c.status === 'error') {
+    body.innerHTML = (c.text ? md(c.text) : '') + '<p style="color:var(--bad);font-size:15px">' + esc(c.err || 'Something went wrong') + '</p>';
+  } else {
+    body.innerHTML = md(c.text);
+    body.classList.toggle('stale', c.status === 'update');
+  }
+  meta.textContent = '';
+  const left = el('span', '', c.status === 'stream' ? 'Writing...' : c.status === 'update' ? 'Updating for the full question...' : c.status === 'done' ? (c.ms ? (c.ms / 1000).toFixed(1) + 's' : '') : '');
+  meta.appendChild(left);
+  if (c.status === 'done' || c.status === 'error') {
+    const r = el('button', '', 'Redo');
+    r.onclick = (e) => { e.stopPropagation(); runCard(c); };
+    meta.appendChild(r);
+  }
+}
+function welcomeEl() {
+  const w = el('div', 'welcome');
+  const ready = S.dgKey.trim() && S.anKey.trim();
+  if (sess.running) {
+    w.appendChild(el('h1', '', 'Listening.'));
+    w.appendChild(el('p', '', 'When they ask you something, the answer appears here. Follow-ups get a new card on top.'));
+    return w;
+  }
+  w.appendChild(el('h1', '', 'Your live call copilot'));
+  w.appendChild(el('p', '', 'It listens to the call, tells your voice from theirs, and puts an answer to each question on this screen.'));
+  const ol = el('ol', 'steps');
+  const items = [
+    ['Add your two keys', ' and paste your background in Settings.'],
+    ['Laptop audio on speakers', ', phone flat on the desk near the laptop.'],
+    ['Tap Start', ' and say "testing, testing" so it knows your voice.'],
+    ['Join the call.', ' Answers appear as they ask.']
+  ];
+  for (const [b, rest] of items) { const li = el('li'); li.appendChild(el('b', '', b)); li.appendChild(document.createTextNode(rest)); ol.appendChild(li); }
+  w.appendChild(ol);
+  const row = el('div', 'row');
+  const s = el('button', 'btn' + (ready ? '' : ' primary'), ready ? 'Settings' : 'Open settings'); s.onclick = openSettings;
+  const d = el('button', 'btn', 'Watch a demo'); d.onclick = startDemo;
+  row.appendChild(s); row.appendChild(d);
+  w.appendChild(row);
+  return w;
+}
+
+/* ---------- audio + deepgram ---------- */
+let ctx = null, stream = null, node = null, sinkGain = null, ws = null, wakeLock = null;
+let carry = new Float32Array(0), pending = [], keepI = null, reconnectT = null, everConnected = false;
+sess.running = false; sess.paused = false;
+const OUT_RATE = 16000, FRAME = 800; // 50 ms frames
+let frameBuf = new Int16Array(FRAME), frameFill = 0;
+let samplesSent = 0;
+
+function dgUrl() {
+  const p = new URLSearchParams({
+    model: 'nova-3', language: S.lang === 'multi' ? 'multi' : 'en',
+    encoding: 'linear16', sample_rate: String(OUT_RATE), channels: '1',
+    interim_results: 'true', utterance_end_ms: '1000', endpointing: '300',
+    smart_format: 'true', punctuate: 'true', diarize: 'true'
+  });
+  if (S.lang !== 'multi') S.terms.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 40).forEach((k) => p.append('keyterm', k));
+  return 'wss://api.deepgram.com/v1/listen?' + p.toString();
+}
+
+function connectDG() {
+  clearTimeout(reconnectT);
+  const conn = ++sess.conn;
+  sess.frames[conn] = []; samplesSent = 0; pending = [];
+  let opened = false;
+  try { ws = new WebSocket(dgUrl(), ['token', S.dgKey.trim()]); }
+  catch (e) { fail('Could not open the listening connection.'); return; }
+  ws.binaryType = 'arraybuffer';
+  const me = ws;
+  ws.onopen = () => {
+    if (me !== ws) return;
+    opened = true;
+    if (everConnected) banner('Reconnected. If ME / THEM labels look wrong, tap Swap.', '', 'OK');
+    everConnected = true;
+    if (sess.running && !sess.paused) setStatus('Listening', 'on');
+    for (const f of pending) sendFrame(f);
+    pending = [];
+  };
+  ws.onmessage = (ev) => { if (me !== ws) return; let m; try { m = JSON.parse(ev.data); } catch (e) { return; } onDG(conn, m); };
+  ws.onerror = () => {};
+  ws.onclose = (ev) => {
+    if (me !== ws) return;
+    ws = null;
+    if (!sess.running) return;
+    if (!opened && !everConnected) { fail('Deepgram refused the connection. Check the Deepgram key in Settings (and that it has credit).'); return; }
+    setStatus('Reconnecting...', 'paused');
+    reconnectT = setTimeout(() => { if (sess.running) connectDG(); }, 800);
+  };
+}
+
+function onDG(conn, m) {
+  if (m.type === 'Results') {
+    const alt = m.channel && m.channel.alternatives && m.channel.alternatives[0];
+    if (!alt) return;
+    const words = alt.words || [];
+    if (!m.is_final) {
+      if (alt.transcript) {
+        sess.interim = { conn, spk: words.length ? (words[0].speaker == null ? 0 : words[0].speaker) : null, text: alt.transcript };
+        renderTranscript();
+      }
+      return;
+    }
+    sess.interim = null;
+    if (words.length) {
+      ingestFinal(conn, words);
+      const last = sess.turns[sess.turns.length - 1];
+      const role = last ? roleOf(last.conn, last.spk) : 'unk';
+      if (role === 'me') {
+        if (wc(last.text) >= 3) scheduleAnswer(150); // you started answering: make sure a card exists
+      } else scheduleAnswer(m.speech_final ? 450 : 1500);
+    } else renderTranscript();
+  } else if (m.type === 'UtteranceEnd') {
+    const last = sess.turns[sess.turns.length - 1];
+    if (last && roleOf(last.conn, last.spk) !== 'me') scheduleAnswer(60);
+  }
+}
+
+function sendFrame(f) {
+  if (!ws || ws.readyState !== 1) return false;
+  ws.send(f.buffer);
+  // loudness bookkeeping aligned to audio time on this connection
+  let sum = 0; for (let i = 0; i < f.length; i++) { const v = f[i] / 32768; sum += v * v; }
+  (sess.frames[sess.conn] || (sess.frames[sess.conn] = [])).push(Math.sqrt(sum / f.length));
+  samplesSent += f.length;
+  return true;
+}
+function pushFrame(f) {
+  if (!sess.running || sess.paused) return;
+  if (ws && ws.readyState === 1) sendFrame(f);
+  else if (pending.length < 160) pending.push(f); // up to 8 s while connecting
+}
+
+function onAudio(input, inRate) {
+  // resample to 16 kHz by block averaging
+  const ratio = inRate / OUT_RATE;
+  const buf = new Float32Array(carry.length + input.length);
+  buf.set(carry); buf.set(input, carry.length);
+  let pos = 0;
+  while (pos + ratio <= buf.length) {
+    const a = Math.floor(pos), b = Math.floor(pos + ratio);
+    let s = 0, n = 0;
+    for (let i = a; i < b; i++) { s += buf[i]; n++; }
+    const v = n ? s / n : buf[a];
+    const c = Math.max(-1, Math.min(1, v));
+    frameBuf[frameFill++] = c < 0 ? c * 0x8000 : c * 0x7fff;
+    if (frameFill === FRAME) { pushFrame(frameBuf); frameBuf = new Int16Array(FRAME); frameFill = 0; }
+    pos += ratio;
+  }
+  carry = buf.slice(Math.floor(pos));
+}
+
+async function startAudio() {
+  // create the audio context inside the tap itself (iPhone needs this), then ask for the mic
+  const AC = window.AudioContext || window.webkitAudioContext;
+  ctx = new AC();
+  const resumed = ctx.resume().catch(() => {});
+  stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true, channelCount: 1 } });
+  await resumed;
+  if (ctx.state !== 'running') { try { await ctx.resume(); } catch (e) {} }
+  const src = ctx.createMediaStreamSource(stream);
+  sinkGain = ctx.createGain(); sinkGain.gain.value = 0; sinkGain.connect(ctx.destination);
+  const rate = ctx.sampleRate;
+  if (ctx.audioWorklet && window.AudioWorkletNode) {
+    const code = `class P extends AudioWorkletProcessor{constructor(){super();this.b=new Float32Array(2048);this.n=0}process(i){const c=i[0]&&i[0][0];if(c){for(let k=0;k<c.length;k++){this.b[this.n++]=c[k];if(this.n===2048){this.port.postMessage(this.b);this.b=new Float32Array(2048);this.n=0}}}return true}}registerProcessor('cc-tap',P);`;
+    const url = URL.createObjectURL(new Blob([code], { type: 'application/javascript' }));
+    try {
+      await ctx.audioWorklet.addModule(url);
+      node = new AudioWorkletNode(ctx, 'cc-tap');
+      node.port.onmessage = (e) => onAudio(e.data, rate);
+    } catch (e) { node = null; }
+  }
+  if (!node) {
+    node = ctx.createScriptProcessor(4096, 1, 1);
+    node.onaudioprocess = (e) => onAudio(e.inputBuffer.getChannelData(0), rate);
+  }
+  src.connect(node); node.connect(sinkGain);
+}
+function stopAudio() {
+  try { if (node) node.disconnect(); } catch (e) {}
+  try { if (stream) stream.getTracks().forEach((t) => t.stop()); } catch (e) {}
+  try { if (ctx) ctx.close(); } catch (e) {}
+  node = null; stream = null; ctx = null; carry = new Float32Array(0); frameFill = 0;
+}
+
+async function keepAwake() {
+  try { if ('wakeLock' in navigator && document.visibilityState === 'visible') wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && sess.running) {
+    keepAwake();
+    if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+  }
+});
+
+function fail(msg) {
+  stopAll(true);
+  setStatus('Stopped', 'err');
+  banner(msg, 'err', 'Settings', openSettings);
+}
+
+async function start() {
+  if (sess.demo) stopDemo();
+  if (!S.dgKey.trim()) { openSettings(); toast('Add the Deepgram key first'); return; }
+  if (!S.anKey.trim()) toast('No Anthropic key yet: it will listen but cannot answer');
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { banner('This browser cannot use the microphone here. Open the page over https in Safari or Chrome.', 'err'); return; }
+  setStatus('Starting...', 'paused');
+  try { await startAudio(); }
+  catch (e) {
+    stopAudio();
+    setStatus('Ready', '');
+    banner(e && e.name === 'NotAllowedError' ? 'Microphone blocked. Allow the mic for this site in your browser settings, then tap Start.' : 'Could not start the microphone: ' + (e.message || e.name), 'err');
+    return;
+  }
+  sess.running = true; sess.paused = false; everConnected = false;
+  if (!sess.startedAt) sess.startedAt = Date.now();
+  startTimer(); keepAwake();
+  connectDG();
+  clearInterval(keepI);
+  keepI = setInterval(() => { if (ws && ws.readyState === 1 && sess.paused) ws.send(JSON.stringify({ type: 'KeepAlive' })); }, 5000);
+  beginCheck();
+  updateMain(); renderCards(); renderTranscript();
+}
+function beginCheck() {
+  sess.check = { conn: sess.conn, votes: {} };
+  banner('Voice check: say "testing, testing" so I know which voice is you.', 'check', 'Skip', () => { sess.check = null; });
+}
+function finishCheck(conn, spk) {
+  sess.check = null;
+  setMe(conn, spk, 'check', true);
+  banner('Got your voice. Join the call; their questions will get answers here.', 'check', 'OK');
+  setTimeout(() => { if ($('#bannerMsg').textContent.startsWith('Got your voice')) banner(''); }, 5000);
+}
+function pause() {
+  if (!sess.running) return;
+  sess.paused = !sess.paused;
+  setStatus(sess.paused ? 'Paused' : 'Listening', sess.paused ? 'paused' : 'on');
+  updateMain();
+}
+function stopAll(keep) {
+  sess.running = false; sess.paused = false; sess.check = null;
+  clearInterval(keepI); clearTimeout(reconnectT); clearTimeout(trigT);
+  if (ws) { try { ws.send(JSON.stringify({ type: 'CloseStream' })); } catch (e) {} try { ws.close(); } catch (e) {} ws = null; }
+  stopAudio();
+  try { if (wakeLock) wakeLock.release(); } catch (e) {}
+  wakeLock = null; clearInterval(timerI);
+  if (!keep) setStatus('Ready', '');
+  updateMain(); renderTranscript();
+  if (!visibleCards().length) renderCards();
+}
+function updateMain() {
+  const b = $('#btnMain');
+  if (sess.demo) { b.className = 'ctl pause'; b.lastElementChild.textContent = 'Stop demo'; return; }
+  if (!sess.running) { b.className = 'ctl go'; b.lastElementChild.textContent = 'Start'; }
+  else if (sess.paused) { b.className = 'ctl go'; b.lastElementChild.textContent = 'Resume'; }
+  else { b.className = 'ctl pause'; b.lastElementChild.textContent = 'Pause'; }
+}
+$('#btnMain').onclick = () => {
+  if (sess.demo) { stopDemo(); return; }
+  if (!sess.running) start(); else pause();
+};
+$('#btnAnswer').onclick = () => maybeAnswer(true);
+$('#btnSwap').onclick = swap;
+
+/* ---------- typed question ---------- */
+$('#btnType').onclick = () => { $('#typeWrap').classList.add('show'); setTimeout(() => $('#fAsk').focus(), 50); };
+$('#typeWrap').onclick = (e) => { if (e.target.id === 'typeWrap') $('#typeWrap').classList.remove('show'); };
+function ask() {
+  const v = $('#fAsk').value.trim(); if (!v) return;
+  $('#fAsk').value = ''; $('#typeWrap').classList.remove('show');
+  answerText(v, 'typed-' + Date.now(), true);
+}
+$('#btnAsk').onclick = ask;
+$('#fAsk').addEventListener('keydown', (e) => { if (e.key === 'Enter') ask(); });
+
+/* ---------- settings ---------- */
+function seg(id, key) {
+  const box = $(id);
+  const paint = () => box.querySelectorAll('button').forEach((b) => b.classList.toggle('sel', b.dataset.v === S[key]));
+  box.querySelectorAll('button').forEach((b) => b.onclick = () => { S[key] = b.dataset.v; paint(); });
+  return paint;
+}
+const paintMode = seg('#segMode', 'mode'), paintLen = seg('#segLen', 'length'), paintLang = seg('#segLang', 'lang');
+function openSettings() {
+  $('#fName').value = S.name; $('#fAbout').value = S.about; $('#fCall').value = S.call; $('#fTerms').value = S.terms;
+  $('#fDg').value = S.dgKey; $('#fAn').value = S.anKey; $('#fModel').value = S.model; $('#fSize').value = S.fs;
+  paintMode(); paintLen(); paintLang();
+  $('#settingsWrap').classList.add('show');
+}
+function readSettings() {
+  S.name = $('#fName').value; S.about = $('#fAbout').value; S.call = $('#fCall').value; S.terms = $('#fTerms').value;
+  S.dgKey = $('#fDg').value.trim(); S.anKey = $('#fAn').value.trim(); S.model = $('#fModel').value; S.fs = Number($('#fSize').value) || 19;
+}
+function closeSettings(save) {
+  if (save) {
+    const langBefore = store.get('settings', {}).lang, termsBefore = store.get('settings', {}).terms;
+    readSettings(); store.set('settings', S); applyLook(); toast('Saved');
+    if (sess.running && ws && (langBefore !== S.lang || termsBefore !== S.terms)) { try { ws.close(); } catch (e) {} }
+  }
+  $('#settingsWrap').classList.remove('show');
+  if (!visibleCards().length) renderCards();
+}
+$('#fSize').oninput = () => document.documentElement.style.setProperty('--fs', $('#fSize').value + 'px');
+$('#btnSettings').onclick = openSettings;
+$('#btnSave').onclick = () => closeSettings(true);
+$('#btnClose').onclick = () => closeSettings(false);
+$('#settingsWrap').onclick = (e) => { if (e.target.id === 'settingsWrap') closeSettings(false); };
+$('#btnDemo').onclick = () => { readSettings(); store.set('settings', S); closeSettings(false); startDemo(); };
+
+function notesText() {
+  const d = new Date(sess.startedAt || Date.now());
+  let s = 'Call notes, ' + d.toLocaleString() + '\n\nTRANSCRIPT\n' + transcriptText(1e9) + '\n\nSUGGESTED ANSWERS\n';
+  for (const c of [...visibleCards()].sort((a, b) => a.id - b.id)) s += '\nQ: ' + c.q + '\nA: ' + (c.text || '').trim() + '\n';
+  return s;
+}
+$('#btnCopy').onclick = async () => {
+  const t = notesText();
+  try { await navigator.clipboard.writeText(t); toast('Notes copied'); }
+  catch (e) {
+    try {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([t], { type: 'text/plain' }));
+      a.download = 'call-notes.txt'; document.body.appendChild(a); a.click(); a.remove();
+      toast('Notes saved as a file');
+    } catch (e2) { toast('Could not copy on this browser'); }
+  }
+};
+$('#btnEnd').onclick = () => {
+  if (sess.demo) stopDemo();
+  stopAll();
+  for (const c of sess.cards) if (c.ctrl) try { c.ctrl.abort(); } catch (e) {}
+  Object.assign(sess, { conn: 0, maps: {}, stats: {}, frames: {}, turns: [], interim: null, cards: [], meRef: null, themRef: null, check: null, startedAt: 0 });
+  store.del('session'); banner(''); $('#timer').textContent = '';
+  closeSettings(false); renderCards(); renderTranscript(); toast('Session cleared');
+};
+
+/* ---------- keep the session if the page reloads ---------- */
+let saveT = null;
+function saveSoon() {
+  clearTimeout(saveT);
+  saveT = setTimeout(() => {
+    if (sess.demo) return;
+    store.set('session', {
+      at: Date.now(), startedAt: sess.startedAt,
+      turns: sess.turns.slice(-300).map((t) => ({ id: t.id, conn: t.conn, spk: t.spk, text: t.text, start: t.start, end: t.end, role: roleOf(t.conn, t.spk) })),
+      cards: visibleCards().slice(-40).map((c) => ({ id: c.id, blockId: c.blockId, qStart: c.qStart || 0, q: c.q, text: c.text, typed: !!c.typed }))
+    });
+  }, 800);
+}
+function restore() {
+  const s = store.get('session', null);
+  if (!s || Date.now() - s.at > 3 * 3600 * 1000) return;
+  // earlier connections become fixed roles
+  sess.maps.old = { me: 'me', src: 'restored' };
+  sess.turns = (s.turns || []).map((t) => ({ id: t.id, conn: 'old', spk: t.role === 'me' ? 'me' : 'x', text: t.text, start: 0, end: 0 }));
+  sess.cards = (s.cards || []).map((c) => Object.assign({ status: 'done', gen: 0, qStart: 0, updatedAt: 0 }, c));
+  nextId = Math.max(1, ...sess.turns.map((t) => t.id + 1), ...sess.cards.map((c) => c.id + 1));
+  sess.startedAt = s.startedAt || 0;
+  if (sess.turns.length || sess.cards.length) toast('Restored your last session');
+}
+
+/* ---------- demo (no keys needed) ---------- */
+const DEMO = [
+  ['me', 'Testing, testing, one two three.'],
+  ['them', "Hi, thanks for joining today. Let's start simple. Can you walk me through your background?"],
+  ['me', 'Sure. I work as a business consultant, and alongside that I run a small AI and digital agency that builds automation for clients.'],
+  ['them', 'Nice. So on the technical side, what is the difference between a process and a thread?'],
+  ['me', 'A process has its own memory space, while threads share memory inside one process.'],
+  ['them', 'Right. And in Python specifically, would threads speed up a CPU heavy task? Why or why not?'],
+  ['me', 'Mm.'],
+  ['them', 'Okay, last one. Can you write a quick function that returns the first non repeating character in a string?']
+];
+const DEMO_ANS = [
+  `Sure. I'm a business consultant by day, working on strategy, business analysis and pre-sales, and I also run a small AI-first agency where I build automation and web products for clients.\n\nWhat ties it together is that I like taking a messy business problem and turning it into a working system.\n\nIf they probe:\n- Mention one client automation you shipped [add example]\n- Say why this role is the next step`,
+  `A process is an independent program with its **own memory space**. A thread is a lighter unit of execution **inside a process**, and threads share that process's memory.\n\nSo threads are cheaper to create and can share data easily, but they need locks to avoid stepping on each other.\n\nIf they probe:\n- Context switching between processes costs more\n- A crash in one thread can take down the whole process`,
+  `No, not with standard CPython. The **GIL** lets only one thread run Python bytecode at a time, so CPU bound work does not get faster with threads.\n\nFor CPU heavy work I'd use **multiprocessing** or a process pool. Threads still help for I/O bound work, like network calls, because the GIL is released while waiting.\n\nIf they probe:\n- Newer free-threaded Python builds can remove the GIL, but they're still opt-in`,
+  `I'll count characters first, then return the first one with a count of one.\n\n\`\`\`python\nfrom collections import Counter\n\ndef first_unique(s):\n    counts = Counter(s)\n    for ch in s:\n        if counts[ch] == 1:\n            return ch\n    return None\n\`\`\`\n\nTime O(n), space O(k) where k is the number of distinct characters.`
+];
+let demoTimers = [], demoAnsIdx = 0;
+async function demoAnswer(card, onText) {
+  const lower = card.q.toLowerCase();
+  let idx = /background/.test(lower) ? 0 : /process and a thread/.test(lower) ? 1 : /python/.test(lower) && /thread/.test(lower) ? 2 : /function|non repeating/.test(lower) ? 3 : -1;
+  if (card.typed) idx = -2;
+  const full = idx === -2 ? 'Demo mode has no brain attached. Add your Anthropic key to ask privately.' : idx === -1 ? 'NOQ' : DEMO_ANS[idx];
+  if (full === 'NOQ') { await sleep(400); return full; }
+  await sleep(700);
+  const gen = card.gen;
+  let out = '';
+  const parts = full.match(/\S+\s*|\s+/g) || [];
+  for (const p of parts) { if (card.gen !== gen || !sess.demo) break; out += p; onText(out); await sleep(28); }
+  return full;
+}
+function startDemo() {
+  if (sess.running) stopAll();
+  stopDemo(true);
+  Object.assign(sess, { conn: 0, maps: {}, stats: {}, frames: {}, turns: [], interim: null, cards: [], meRef: null, themRef: null, check: null });
+  sess.demo = true; sess.startedAt = Date.now(); startTimer();
+  const conn = ++sess.conn;
+  sess.frames[conn] = [];
+  setStatus('Demo: listening', 'on'); updateMain();
+  banner('Voice check: say "testing, testing" so I know which voice is you.', 'check');
+  sess.check = { conn, votes: {} };
+  renderCards(); renderTranscript();
+  let t = 600, clock = 0;
+  DEMO.forEach(([who, text], i) => {
+    const spk = who === 'me' ? 0 : 1;
+    const loud = who === 'me' ? 0.2 : 0.07;
+    const ws_ = text.split(' ');
+    const words = [];
+    ws_.forEach((w) => { words.push({ word: w.replace(/[^\w']/g, '').toLowerCase(), punctuated_word: w, start: clock, end: clock + 0.3, speaker: spk }); clock += 0.33; });
+    // synth loudness frames for this stretch of audio
+    const fr = sess.frames[conn];
+    while (fr.length < Math.ceil(clock / 0.05) + 2) fr.push(loud);
+    clock += 0.8;
+    const step = who === 'me' ? 120 : 150;
+    words.forEach((_, k) => {
+      demoTimers.push(setTimeout(() => {
+        if (!sess.demo) return;
+        onDG(conn, { type: 'Results', is_final: false, channel: { alternatives: [{ transcript: words.slice(0, k + 1).map((x) => x.punctuated_word).join(' '), words: words.slice(0, k + 1) }] } });
+      }, t + k * step));
+    });
+    t += words.length * step + 120;
+    demoTimers.push(setTimeout(() => { if (sess.demo) onDG(conn, { type: 'Results', is_final: true, speech_final: true, channel: { alternatives: [{ transcript: text, words }] } }); }, t));
+    demoTimers.push(setTimeout(() => { if (sess.demo) onDG(conn, { type: 'UtteranceEnd' }); }, t + 700));
+    t += who === 'me' ? (i === 0 ? 2600 : 2200) : 6200;
+  });
+  demoTimers.push(setTimeout(() => { if (sess.demo) { setStatus('Demo finished', ''); banner('That was the demo. Add your keys in Settings to use it on a real call.', '', 'Settings', openSettings); } }, t + 1500));
+}
+function stopDemo(silent) {
+  demoTimers.forEach(clearTimeout); demoTimers = [];
+  if (sess.demo) {
+    sess.demo = false; sess.check = null;
+    for (const c of sess.cards) if (c.ctrl) try { c.ctrl.abort(); } catch (e) {}
+    Object.assign(sess, { conn: 0, maps: {}, stats: {}, frames: {}, turns: [], interim: null, cards: [], startedAt: 0 });
+    $('#timer').textContent = '';
+    if (!silent) { setStatus('Ready', ''); banner(''); renderCards(); renderTranscript(); }
+  }
+  updateMain();
+}
+
+/* ---------- boot ---------- */
+window.__cc = { sess, S, onDG, maybeAnswer, latestBlock, roleOf, md, systemPrompt, userPrompt };
+restore();
+renderCards(); renderTranscript(); updateMain();
+if (!S.dgKey && !S.anKey && !sess.cards.length) setTimeout(() => { if (!sess.demo && !sess.running) openSettings(); }, 400);
+})();
+</script>
+</body>
+</html>
