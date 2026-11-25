@@ -5,6 +5,12 @@ A live copilot for calls. Your phone listens to the call, works out which voice 
 - **Interview mode:** answers written in first person, ready to say out loud, built only from your background.
 - **Meeting mode:** what to say, plus facts, code or concepts they ask for, and any action they give you.
 
+### AWS library interview
+
+Open [the AWS library preset](https://digitglobalhq.github.io/call-copilot/?round=aws-library) on the phone. It uses Python, Boto3 and pytest for a 45-minute build and 15-minute discussion. Tap **Set up API keys** on a fresh browser. A browser with both keys saved is ready for **Listen**.
+
+Put the laptop on speakers. A spoken assignment prompts build steps, a Python implementation and a test. Follow-up requests use the transcript and earlier code suggestions. For optional speaker calibration, say “testing, testing” before the other person starts. You can add a company to the link with a fragment such as `#company=Example`.
+
 ## Why it is a web page, not Claude Code
 
 - The Claude app and Claude Code work turn by turn. Neither can keep the mic open and follow a call continuously.

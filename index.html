@@ -223,7 +223,7 @@ html.pip #btnPop{display:none}
   <div class="sheet" role="dialog" aria-label="Settings">
     <div class="grab"></div>
     <h2>Set up</h2>
-    <div class="small">Everything here stays on this phone only.</div>
+    <div class="small">Settings are saved in this browser. Audio goes to Deepgram. Your call context and transcript go to Anthropic for answers.</div>
 
     <h3>Mode</h3>
     <div class="seg" id="segMode"><button data-v="interview">Interview</button><button data-v="meeting">Meeting</button></div>
@@ -314,7 +314,33 @@ const store = {
 };
 
 const DEFAULTS = { dgKey: '', anKey: '', mode: 'interview', name: '', about: '', call: '', terms: '', length: 'short', lang: 'en', model: 'claude-haiku-5-5', fs: 19, examples: 'on', codeNotes: 'on', source: '' };
-let S = Object.assign({}, DEFAULTS, store.get('settings', {}));
+const libraryRound = new URLSearchParams(location.search).get('round') === 'aws-library';
+const company = (new URLSearchParams(location.hash.slice(1)).get('company') || '').trim().slice(0, 64);
+const settingsKey = libraryRound ? 'settings.aws-library' : 'settings';
+const sessionKey = libraryRound ? 'session.aws-library' : 'session';
+const sharedFields = ['dgKey', 'anKey', 'name', 'about'];
+const libraryDefaults = {
+  mode: 'interview', source: 'room', lang: 'en', model: 'claude-sonnet-5-5',
+  length: 'short', examples: 'off', codeNotes: 'off',
+  call: 'SDE 2 Infra. Build a small reusable AWS infrastructure library another team can adopt. The interviewer supplies the task. Use Python 3, Boto3 and pytest unless they choose otherwise. The build is 45 minutes, followed by 15 minutes of design discussion.',
+  terms: [company, 'Boto3, Botocore, pytest, Stubber, paginator, idempotency, throttling, IAM, EC2, EBS, S3, SQS, EKS, Karpenter, CloudWatch, Terraform'].filter(Boolean).join(', ')
+};
+function loadSettings() {
+  const base = store.get('settings', {});
+  if (!libraryRound) return { ...DEFAULTS, ...base };
+  const settings = { ...DEFAULTS, ...libraryDefaults, ...store.get(settingsKey, {}) };
+  for (const key of sharedFields) settings[key] = base[key] || '';
+  return settings;
+}
+let S = loadSettings();
+function saveSettings() {
+  if (!libraryRound) { store.set(settingsKey, S); return; }
+  const base = store.get('settings', {}), round = { ...S };
+  for (const key of sharedFields) { base[key] = S[key]; delete round[key]; }
+  store.set('settings', base);
+  store.set(settingsKey, round);
+}
+const libraryInterview = () => libraryRound && S.mode === 'interview';
 
 /* ---------- dom ---------- */
 let D = document; // the document the copilot currently lives in (main tab or floating window)
@@ -358,7 +384,7 @@ function setStatus(text, state) {
 function applyLook() {
   document.documentElement.style.setProperty('--fs', S.fs + 'px');
   if (D !== document) D.documentElement.style.setProperty('--fs', S.fs + 'px');
-  $('#modeChip').textContent = S.mode === 'meeting' ? 'Meeting' : 'Interview';
+  $('#modeChip').textContent = libraryInterview() ? 'AWS library' : S.mode === 'meeting' ? 'Meeting' : 'Interview';
 }
 applyLook();
 
@@ -528,7 +554,10 @@ function ingestFinal(conn, words) {
   }
   for (const r of runs) {
     // voice check: who says "testing"?
-    if (sess.check && sess.check.conn === conn) {
+    if (libraryInterview() && !sess.demo && !tabMode() && mapFor(conn).me == null &&
+        r.wt.map((word) => word.n).join(' ') === 'testing testing') {
+      finishCheck(conn, r.spk);
+    } else if (sess.check && sess.check.conn === conn) {
       const hits = r.words.filter((x) => /test/i.test(x)).length;
       if (hits) {
         sess.check.votes[r.spk] = (sess.check.votes[r.spk] || 0) + hits;
@@ -543,7 +572,7 @@ function ingestFinal(conn, words) {
     }
   }
   if (sess.turns.length > 1500) sess.turns.splice(0, sess.turns.length - 1500);
-  autoResolve(conn);
+  if (!libraryInterview() || sess.demo) autoResolve(conn);
   renderTranscript();
   saveSoon();
 }
@@ -709,6 +738,21 @@ function updateThinking() {
 
 /* ---------- claude ---------- */
 function systemPrompt() {
+  if (libraryInterview()) return `You assist a candidate during a live, spoken AWS infrastructure library exercise. The phone displays your response. ME is the candidate, THEM the interviewer, and ? an unidentified speaker. Infer who is assigning work from context.
+
+Treat a spoken assignment, example, acceptance criterion or change in requirements as a request, even when it has no question mark. As soon as the task is actionable, answer automatically. For greetings, filler, incomplete setup with no actionable task, or the candidate simply narrating their work, output only NOQ.
+
+For a new build task, return these four short Markdown sections in this same reply:
+1. Task: restate the requested behavior, inputs and outputs. Mark any assumption and give at most two useful clarification questions. Proceed on a stated, reversible assumption where possible.
+2. Build steps: give three numbered, implementable steps, starting with the public API.
+3. Implementation: give the filename and a compact, runnable Python module in a fenced code block. Use Boto3 and an injected client when appropriate. Use the interviewer's chosen language if different.
+4. Test: give a runnable focused pytest test with imports, using botocore.stub.Stubber or a small fake where appropriate. End with the command to run it.
+
+Prioritize a working end-to-end example in the first answer. Address pagination for list APIs and safe retries for writes when the task needs them. Name the official AWS operation to check when its behavior matters. Flag uncertain SDK details. Never claim that you saw the editor or ran code. For a changed requirement show only the necessary code changes and a matching test. For a discussion question lead with a direct answer and one trade-off specific to the library. Keep personal examples grounded in the supplied background.
+
+Company: ${company || '(not specified)'}
+Call brief: ${S.call}
+Candidate background: ${S.about || '(not provided)'}`;
   const name = S.name.trim() || 'the user';
   const len = {
     short: 'Keep the part to say to 2 to 4 sentences, about 20 seconds out loud.',
@@ -771,12 +815,17 @@ function userPrompt(card) {
     return `Live transcript so far (oldest first):\n${transcriptText()}${it}\n\nME just tapped "Answer now". Find the most recent question or request aimed at ME (usually the last thing THEM said; it may be unfinished, or mislabelled as ME or ?) and write what ME should say right now. Best guess at it: "${card.q}". Never reply NOQ.`;
   }
   if (card.typed) return `Live transcript so far (oldest first):\n${transcriptText()}\n\nME is asking you privately (THEM cannot see this): "${card.q}"\n\nAnswer ME directly and briefly. Do not reply NOQ.`;
+  if (libraryInterview()) {
+    const previous = visibleCards().filter((c) => c !== card && c.status === 'done' && c.text).slice(-2);
+    const proposals = previous.map((c) => c.text.slice(0, 8000)).join('\n\n');
+    return `Transcript:\n${transcriptText()}\n\nEarlier suggestions (the candidate may have implemented something different):\n${proposals || '(none)'}\n\nNewest speech: ${card.q}\nApply the build, follow-up or discussion instructions to this speech.`;
+  }
   return `Live transcript so far (oldest first):\n${transcriptText()}\n\nNewest from THEM: "${card.q}"\n\nWrite what ME should say now, or NOQ.`;
 }
 
 async function streamClaude(card, onText) {
   const body = {
-    model: S.model, max_tokens: 1200, stream: true,
+    model: S.model, max_tokens: libraryInterview() ? 4800 : 1200, stream: true,
     system: [{ type: 'text', text: systemPrompt(), cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: userPrompt(card) }]
   };
@@ -912,7 +961,20 @@ function welcomeEl() {
   const ready = S.dgKey.trim() && S.anKey.trim();
   if (sess.running) {
     w.appendChild(el('h1', '', 'Listening.'));
-    w.appendChild(el('p', '', 'When they ask you something, the answer appears here. Follow-ups get a new card on top.'));
+    w.appendChild(el('p', '', libraryInterview() ? 'The task, build steps, code and test appear here as the interviewer explains the problem.' : 'When they ask you something, the answer appears here. Follow-ups get a new card on top.'));
+    return w;
+  }
+  if (libraryInterview()) {
+    w.appendChild(el('h1', '', company ? company + ' · AWS library interview' : 'AWS library interview'));
+    w.appendChild(el('p', '', '45-minute build · 15-minute discussion · Python, Boto3 and pytest'));
+    if (!ready) {
+      const setup = el('button', 'btn primary', 'Set up API keys');
+      setup.onclick = openKeySettings;
+      w.appendChild(setup);
+    }
+    w.appendChild(el('p', '', tabMode()
+      ? 'Tap Listen and share the meeting tab with audio.'
+      : 'Use laptop speakers. Keep this page open and tap Listen. The spoken task will trigger steps, code and a test.'));
     return w;
   }
   w.appendChild(el('h1', '', 'Your live call copilot'));
@@ -1236,6 +1298,7 @@ function fail(msg) {
 
 async function start() {
   if (sess.demo) stopDemo();
+  if (libraryInterview() && (!S.dgKey.trim() || !S.anKey.trim())) { openKeySettings(); toast('Save both keys once to enable live answers'); return; }
   if (!S.dgKey.trim()) { openSettings(); toast('Add the Deepgram key first'); return; }
   if (!S.anKey.trim()) toast('No Anthropic key yet: it will listen but cannot answer');
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { banner('This browser cannot use the microphone here. Open the page over https in Safari or Chrome.', 'err'); return; }
@@ -1264,7 +1327,8 @@ async function start() {
   if (tabMode()) {
     if (D === document && window.documentPictureInPicture) banner('Listening to the meeting tab (THEM) and your mic (ME). Pop it out to float over the meeting.', 'check', 'Pop out', popOut);
     else banner(heardBefore ? 'Listening again. Everything said so far is kept.' : 'Listening to the meeting tab (THEM) and your mic (ME).', '', 'OK');
-  } else if (!heardBefore && sess.meRef == null) beginCheck();
+  } else if (libraryInterview()) banner('');
+  else if (!heardBefore && sess.meRef == null) beginCheck();
   else banner('Listening again. Everything said so far is kept.', '', 'OK');
   updateMain(); renderCards(); renderTranscript();
 }
@@ -1309,7 +1373,7 @@ $('#btnMain').onclick = () => {
 };
 $('#btnAnswer').onclick = answerNow;
 $('#btnSwap').onclick = swap;
-$('#modeChip').onclick = () => { S.mode = S.mode === 'meeting' ? 'interview' : 'meeting'; store.set('settings', S); applyLook(); toast(S.mode === 'meeting' ? 'Meeting mode' : 'Interview mode'); };
+$('#modeChip').onclick = () => { S.mode = S.mode === 'meeting' ? 'interview' : 'meeting'; saveSettings(); applyLook(); toast(S.mode === 'meeting' ? 'Meeting mode' : 'Interview mode'); };
 
 /* ---------- typed question ---------- */
 $('#btnType').onclick = () => { $('#typeWrap').classList.add('show'); setTimeout(() => $('#fAsk').focus(), 50); };
@@ -1336,14 +1400,19 @@ function openSettings() {
   paintMode(); paintLen(); paintLang(); paintEx(); paintCode(); paintSrc();
   $('#settingsWrap').classList.add('show');
 }
+function openKeySettings() {
+  openSettings();
+  const field = S.dgKey.trim() ? '#fAn' : '#fDg';
+  $(field).scrollIntoView({ block: 'center' });
+}
 function readSettings() {
   S.name = $('#fName').value; S.about = $('#fAbout').value; S.call = $('#fCall').value; S.terms = $('#fTerms').value;
   S.dgKey = $('#fDg').value.trim(); S.anKey = $('#fAn').value.trim(); S.model = $('#fModel').value; S.fs = Number($('#fSize').value) || 19;
 }
 function closeSettings(save) {
   if (save) {
-    const langBefore = store.get('settings', {}).lang, termsBefore = store.get('settings', {}).terms;
-    readSettings(); store.set('settings', S); applyLook(); toast('Saved');
+    const { lang: langBefore, terms: termsBefore } = loadSettings();
+    readSettings(); saveSettings(); applyLook(); toast('Saved');
     if (sess.running && sess.srcInUse && sess.srcInUse !== S.source) {
       stopAll(true); setStatus('Ready', '');
       banner('Listen through changed. Click Listen to start again with the new setting. Everything so far is kept.', '', 'Listen', () => start());
@@ -1357,7 +1426,7 @@ $('#btnSettings').onclick = openSettings;
 $('#btnSave').onclick = () => closeSettings(true);
 $('#btnClose').onclick = () => closeSettings(false);
 $('#settingsWrap').onclick = (e) => { if (e.target.id === 'settingsWrap') closeSettings(false); };
-$('#btnDemo').onclick = () => { readSettings(); store.set('settings', S); closeSettings(false); startDemo(); };
+$('#btnDemo').onclick = () => { readSettings(); saveSettings(); closeSettings(false); startDemo(); };
 
 function notesText() {
   const d = new Date(sess.startedAt || Date.now());
@@ -1382,7 +1451,7 @@ $('#btnEnd').onclick = () => {
   stopAll();
   for (const c of sess.cards) if (c.ctrl) try { c.ctrl.abort(); } catch (e) {}
   Object.assign(sess, { conn: 0, maps: {}, stats: {}, frames: {}, turns: [], interim: null, cards: [], meRef: null, themRef: null, check: null, startedAt: 0 });
-  store.del('session'); banner(''); $('#timer').textContent = '';
+  store.del(sessionKey); banner(''); $('#timer').textContent = '';
   closeSettings(false); renderCards(); renderTranscript(); toast('Session cleared');
 };
 
@@ -1392,7 +1461,7 @@ function saveSoon() {
   clearTimeout(saveT);
   saveT = setTimeout(() => {
     if (sess.demo) return;
-    store.set('session', {
+    store.set(sessionKey, {
       at: Date.now(), startedAt: sess.startedAt,
       turns: sess.turns.slice(-300).map((t) => ({ id: t.id, conn: t.conn, spk: t.spk, text: t.text, start: t.start, end: t.end, role: roleOf(t.conn, t.spk) })),
       cards: visibleCards().slice(-40).map((c) => ({ id: c.id, blockId: c.blockId, qStart: c.qStart || 0, q: c.q, text: c.text, typed: !!c.typed }))
@@ -1400,7 +1469,7 @@ function saveSoon() {
   }, 800);
 }
 function restore() {
-  const s = store.get('session', null);
+  const s = store.get(sessionKey, null);
   if (!s || Date.now() - s.at > 3 * 3600 * 1000) return;
   // earlier connections become fixed roles
   sess.maps.old = { me: 'me', src: 'restored' };
@@ -1527,7 +1596,7 @@ if (!S.source) S.source = (window.matchMedia && matchMedia('(pointer: fine)').ma
 window.__cc = { sess, S, onDG, maybeAnswer, latestBlock, roleOf, md, systemPrompt, userPrompt, answerNow, answerLine, audioLost, watchdog, popOut, dgUrl };
 restore();
 renderCards(); renderTranscript(); updateMain();
-if (!S.dgKey && !S.anKey && !sess.cards.length) setTimeout(() => { if (!sess.demo && !sess.running) openSettings(); }, 400);
+if (!libraryRound && !S.dgKey && !S.anKey && !sess.cards.length) setTimeout(() => { if (!sess.demo && !sess.running) openSettings(); }, 400);
 })();
 </script>
 </body>
