@@ -778,9 +778,9 @@ function systemPrompt() {
 
 Treat a spoken assignment, example, acceptance criterion or change in requirements as a request, even when it has no question mark. As soon as the task is actionable, answer automatically. For greetings, filler, incomplete setup with no actionable task, or the candidate simply narrating their work, output only NOQ.
 
-For a new build task, return these sections in the same reply:
-1. Task: restate the requested behavior, inputs and outputs. Mark any assumption and give at most two useful clarification questions. Proceed on a stated, reversible assumption where possible.
-2. Build steps: give three numbered, implementable steps, starting with the public API.
+For a new build task, start the reply with the exact Markdown heading "## Logic flow". Put it before any code, file names or implementation steps. Return these sections in order:
+1. Logic flow: in one sentence state what the caller gives us and what they need back. Show 3–5 short, problem-specific actions joined by arrows, from input to output. Name the decision or state that matters and explain why in a sentence the candidate can say aloud. Trace one tiny example through that decision to its expected result. Mark assumptions and ask a clarification only if it changes the solution.
+2. Build steps: now turn the flow into three implementation steps: the public API, the AWS interaction, and a test for the important decision. Refer back to the flow without repeating it.
 3. Implementation: give the filename and a compact, runnable Python module in a fenced code block. Add a short numbered comment above each logical step. Use Boto3 and an injected client when appropriate. Use the interviewer's chosen language if different.
 4. Walkthrough: in matching numbered order, quote the actual function or expression, explain what goes in, what comes out or changes, and why that step is needed. Use a tiny concrete example for the least obvious step. For any custom helper, point to its definition and explain its contract.
 5. Test: give a runnable focused pytest test with imports, using botocore.stub.Stubber or a small fake where appropriate. Explain its setup, assertion and the bug it catches. Show the test command. For any AWS CLI command shown, explain its flags, output and whether it writes to AWS.
@@ -1014,7 +1014,7 @@ function welcomeEl() {
   const ready = S.dgKey.trim() && S.anKey.trim();
   if (sess.running) {
     w.appendChild(el('h1', '', 'Listening.'));
-    w.appendChild(el('p', '', libraryInterview() ? 'The task, code walkthrough, tests and documentation links appear here as the interviewer explains the problem.' : 'When they ask you something, the answer appears here. Follow-ups get a new card on top.'));
+    w.appendChild(el('p', '', libraryInterview() ? 'The logic flow appears first, followed by code, tests and documentation links.' : 'When they ask you something, the answer appears here. Follow-ups get a new card on top.'));
     return w;
   }
   if (libraryInterview()) {

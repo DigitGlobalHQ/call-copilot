@@ -11,7 +11,7 @@ Open [the AWS library preset](https://digitglobalhq.github.io/call-copilot/?roun
 
 Put the laptop on speakers. A spoken assignment prompts build steps, a Python implementation and a test. Follow-up requests use the transcript and earlier code suggestions. For optional speaker calibration, say “testing, testing” before the other person starts. You can add a company to the link with a fragment such as `#company=Example`.
 
-Each build answer includes a numbered code walkthrough, the reason for each step and likely cross-questions with short answers. The Documentation section pairs each cited function or CLI command with an official source and a search phrase under **Type in Chrome**. Use that phrase on the laptop to keep the phone listening. When the exact page is uncertain, **Find in docs** opens a site-restricted search.
+Each build answer opens with **Logic flow**. It traces the inputs, main decision and output using a small example you can explain aloud. The implementation follows with a numbered code walkthrough and likely cross-questions. The Documentation section pairs each cited function or CLI command with an official source and a search phrase under **Type in Chrome**. Use that phrase on the laptop to keep the phone listening. When the exact page is uncertain, **Find in docs** opens a site-restricted search.
 
 ## Why it is a web page, not Claude Code
 
