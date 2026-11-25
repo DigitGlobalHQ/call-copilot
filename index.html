@@ -75,6 +75,8 @@ button.chip{cursor:pointer}
 .card-a pre{background:#0a0b0e;border:1px solid var(--line);border-radius:10px;padding:10px 12px;overflow-x:auto;margin:.4em 0 .7em;font-size:max(13px,calc(var(--fs)*.72));line-height:1.45}
 .card-a pre code{background:none;padding:0;font-size:1em;line-height:inherit;white-space:pre-wrap;overflow-wrap:anywhere}
 .card-a pre .cmt{color:#8fc7a3;font-style:italic}
+.doc-ref{padding:.45em 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.doc-ref small{display:block;color:var(--muted);margin-top:.2em}
 .card.old .card-a{max-height:5.2em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 55%,transparent);mask-image:linear-gradient(#000 55%,transparent)}
 .card.old.open .card-a{max-height:none;-webkit-mask-image:none;mask-image:none}
 .card.old{opacity:.78}
@@ -406,6 +408,38 @@ function inl(s) {
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
 }
+// The model supplies a symbol and documentation path. The app owns the origins
+// and builds the same copyable Chrome query even when the exact path is unknown.
+const docSources = new Map(Object.entries({
+  boto3: 'https://docs.aws.amazon.com/boto3/latest/',
+  botocore: 'https://docs.aws.amazon.com/botocore/latest/',
+  awscli: 'https://docs.aws.amazon.com/cli/latest/reference/',
+  aws: 'https://docs.aws.amazon.com/',
+  python: 'https://docs.python.org/3/',
+  pytest: 'https://docs.pytest.org/en/stable/',
+  go: 'https://pkg.go.dev/'
+}));
+function renderReference(match) {
+  const [, source, rawSymbol, rawPath = ''] = match;
+  const base = docSources.get(source.trim().toLowerCase());
+  const symbol = rawSymbol.trim();
+  if (!base || !symbol) return '';
+  const scope = base.slice('https://'.length).replace(/\/$/, '');
+  const query = 'site:' + scope + ' ' + symbol;
+  const search = 'https://www.google.com/search?q=' + encodeURIComponent(query);
+  let direct = '';
+  const path = rawPath.trim();
+  if (path && path !== '-') {
+    try {
+      const url = new URL(path, base);
+      if (url.href.startsWith(base) && !url.search && !url.username && !url.password) direct = url.href;
+    } catch { /* The scoped search is still available. */ }
+  }
+  const linkAttrs = ' target="_blank" rel="noopener noreferrer"';
+  return '<div class="doc-ref"><a href="' + esc(direct || search) + '"' + linkAttrs + '>' +
+    esc(symbol) + (direct ? ' ↗' : ' · Find in docs') + '</a><small>Type in Chrome</small><a href="' +
+    esc(search) + '"' + linkAttrs + '><code>' + esc(query) + '</code></a></div>';
+}
 function mdBlocks(t) {
   let out = '', para = [], list = [];
   const flushP = () => { if (para.length) { out += '<p>' + para.map(inl).join('<br>') + '</p>'; para = []; } };
@@ -414,7 +448,9 @@ function mdBlocks(t) {
     const line = raw.replace(/\s+$/, '');
     const li = line.match(/^\s*(?:[-*\u2022]|\d+[.)])\s+(.*)$/);
     const h = line.match(/^\s*#{1,6}\s+(.*)$/);
-    if (!line.trim()) { flushP(); flushL(); }
+    const ref = libraryRound && line.match(/^\s*(?:[-*]\s+)?DOC\s*\|\s*([^|]+)\|\s*([^|]+?)(?:\s*\|\s*(.*))?\s*$/i);
+    if (ref) { flushP(); flushL(); out += renderReference(ref); }
+    else if (!line.trim()) { flushP(); flushL(); }
     else if (h) { flushP(); flushL(); out += '<h4>' + inl(h[1]) + '</h4>'; }
     else if (li) { flushP(); list.push(li[1]); }
     else { flushL(); para.push(line); }
@@ -742,13 +778,26 @@ function systemPrompt() {
 
 Treat a spoken assignment, example, acceptance criterion or change in requirements as a request, even when it has no question mark. As soon as the task is actionable, answer automatically. For greetings, filler, incomplete setup with no actionable task, or the candidate simply narrating their work, output only NOQ.
 
-For a new build task, return these four short Markdown sections in this same reply:
+For a new build task, return these sections in the same reply:
 1. Task: restate the requested behavior, inputs and outputs. Mark any assumption and give at most two useful clarification questions. Proceed on a stated, reversible assumption where possible.
 2. Build steps: give three numbered, implementable steps, starting with the public API.
-3. Implementation: give the filename and a compact, runnable Python module in a fenced code block. Use Boto3 and an injected client when appropriate. Use the interviewer's chosen language if different.
-4. Test: give a runnable focused pytest test with imports, using botocore.stub.Stubber or a small fake where appropriate. End with the command to run it.
+3. Implementation: give the filename and a compact, runnable Python module in a fenced code block. Add a short numbered comment above each logical step. Use Boto3 and an injected client when appropriate. Use the interviewer's chosen language if different.
+4. Walkthrough: in matching numbered order, quote the actual function or expression, explain what goes in, what comes out or changes, and why that step is needed. Use a tiny concrete example for the least obvious step. For any custom helper, point to its definition and explain its contract.
+5. Test: give a runnable focused pytest test with imports, using botocore.stub.Stubber or a small fake where appropriate. Explain its setup, assertion and the bug it catches. Show the test command. For any AWS CLI command shown, explain its flags, output and whether it writes to AWS.
+6. Cross-questions: give two likely interviewer follow-ups tied to these exact design choices. Pair each with a short answer the candidate can say aloud and defend.
+7. Documentation: list each distinct external SDK operation (including paginator operations), Python built-in, standard library function or method, testing API, and AWS CLI command actually used in the implementation, explanations and tests. Deduplicate repeated uses. Link each to its exact official page or section where known. For candidate-defined functions use the walkthrough and document the public APIs they call.
 
-Prioritize a working end-to-end example in the first answer. Address pagination for list APIs and safe retries for writes when the task needs them. Name the official AWS operation to check when its behavior matters. Flag uncertain SDK details. Never claim that you saw the editor or ran code. For a changed requirement show only the necessary code changes and a matching test. For a discussion question lead with a direct answer and one trade-off specific to the library. Keep personal examples grounded in the supplied background.
+Emit each documentation entry on its own plain line outside code fences using exactly this format:
+DOC | source | qualified function name or CLI command | path relative to that source
+Sources and roots: ${Array.from(docSources, ([source, root]) => source + ' = ' + root).join(', ')}.
+Examples of the format (include only entries used in this answer):
+DOC | boto3 | EC2.Client.describe_volumes | reference/services/ec2/client/describe_volumes.html
+DOC | awscli | aws ec2 describe-volumes | ec2/describe-volumes.html
+DOC | python | datetime.timedelta | library/datetime.html#datetime.timedelta
+DOC | botocore | Stubber.add_response | reference/stubber.html#botocore.stub.Stubber.add_response
+If the exact page is uncertain, put a single dash in the path field. The app builds a scoped docs search and displays the exact text to type in Chrome. Keep endpoints, account IDs, queue URLs and other caller-supplied arguments out of search terms.
+
+Prioritize a working end-to-end example in the first answer. Address pagination for list APIs and safe retries for writes when the task needs them. Flag uncertain SDK details. Never claim that you saw the editor or ran code. For a changed requirement, show the necessary changes, their step-by-step explanation, the matching test and documentation for the APIs used. For a cross-question, lead with a short spoken answer, point to the relevant line or function, explain its trade-off and include the applicable documentation entries. Keep personal examples grounded in the supplied background.
 
 Company: ${company || '(not specified)'}
 Call brief: ${S.call}
@@ -810,22 +859,26 @@ function userPrompt(card) {
     const who = t ? LABEL[roleOf(t.conn, t.spk)] : 'THEM';
     return `Transcript of the call up to that moment (oldest first):\n${transcriptText(40000, card.lineId)}\n\nME tapped this line from the call (said by ${who}): "${card.q}"\n\nTreat it as the question or topic ME needs to respond to, as of that moment in the call, and write what ME should say. If it was ME's own line, write a stronger way for ME to say it. Never reply NOQ.`;
   }
-  if (card.now) {
-    const it = sess.interim && sess.interim.text ? `\n(still speaking, not final) ${LABEL[roleOf(sess.interim.conn, sess.interim.spk)]}: ${sess.interim.text}` : '';
-    return `Live transcript so far (oldest first):\n${transcriptText()}${it}\n\nME just tapped "Answer now". Find the most recent question or request aimed at ME (usually the last thing THEM said; it may be unfinished, or mislabelled as ME or ?) and write what ME should say right now. Best guess at it: "${card.q}". Never reply NOQ.`;
-  }
-  if (card.typed) return `Live transcript so far (oldest first):\n${transcriptText()}\n\nME is asking you privately (THEM cannot see this): "${card.q}"\n\nAnswer ME directly and briefly. Do not reply NOQ.`;
+  let earlierSuggestions = '';
   if (libraryInterview()) {
     const previous = visibleCards().filter((c) => c !== card && c.status === 'done' && c.text).slice(-2);
     const proposals = previous.map((c) => c.text.slice(0, 8000)).join('\n\n');
-    return `Transcript:\n${transcriptText()}\n\nEarlier suggestions (the candidate may have implemented something different):\n${proposals || '(none)'}\n\nNewest speech: ${card.q}\nApply the build, follow-up or discussion instructions to this speech.`;
+    if (proposals) earlierSuggestions = '\n\nEarlier suggestions (the candidate may have implemented something different):\n' + proposals;
+  }
+  if (card.now) {
+    const it = sess.interim && sess.interim.text ? `\n(still speaking, not final) ${LABEL[roleOf(sess.interim.conn, sess.interim.spk)]}: ${sess.interim.text}` : '';
+    return `Live transcript so far (oldest first):\n${transcriptText()}${it}${earlierSuggestions}\n\nME just tapped "Answer now". Find the most recent question or request aimed at ME (usually the last thing THEM said; it may be unfinished, or mislabelled as ME or ?) and write what ME should say right now. Best guess at it: "${card.q}". Never reply NOQ.`;
+  }
+  if (card.typed) return `Live transcript so far (oldest first):\n${transcriptText()}${earlierSuggestions}\n\nME is asking you privately (THEM cannot see this): "${card.q}"\n\nAnswer ME directly and briefly. Do not reply NOQ.`;
+  if (libraryInterview()) {
+    return `Transcript:\n${transcriptText()}${earlierSuggestions}\n\nNewest speech: ${card.q}\nApply the build, follow-up or discussion instructions to this speech.`;
   }
   return `Live transcript so far (oldest first):\n${transcriptText()}\n\nNewest from THEM: "${card.q}"\n\nWrite what ME should say now, or NOQ.`;
 }
 
 async function streamClaude(card, onText) {
   const body = {
-    model: S.model, max_tokens: libraryInterview() ? 4800 : 1200, stream: true,
+    model: S.model, max_tokens: libraryInterview() ? 6600 : 1200, stream: true,
     system: [{ type: 'text', text: systemPrompt(), cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: userPrompt(card) }]
   };
@@ -928,7 +981,7 @@ function renderCards(scrollTop) {
     a.appendChild(q);
     const body = el('div', 'card-a'); a.appendChild(body);
     const meta = el('div', 'card-meta'); a.appendChild(meta);
-    if (i > 0) a.onclick = () => a.classList.toggle('open');
+    if (i > 0) a.onclick = (event) => { if (!event.target.closest('a, button')) a.classList.toggle('open'); };
     cardsEl.appendChild(a);
     c.node = a;
     paintCard(c);
@@ -961,7 +1014,7 @@ function welcomeEl() {
   const ready = S.dgKey.trim() && S.anKey.trim();
   if (sess.running) {
     w.appendChild(el('h1', '', 'Listening.'));
-    w.appendChild(el('p', '', libraryInterview() ? 'The task, build steps, code and test appear here as the interviewer explains the problem.' : 'When they ask you something, the answer appears here. Follow-ups get a new card on top.'));
+    w.appendChild(el('p', '', libraryInterview() ? 'The task, code walkthrough, tests and documentation links appear here as the interviewer explains the problem.' : 'When they ask you something, the answer appears here. Follow-ups get a new card on top.'));
     return w;
   }
   if (libraryInterview()) {
@@ -974,7 +1027,7 @@ function welcomeEl() {
     }
     w.appendChild(el('p', '', tabMode()
       ? 'Tap Listen and share the meeting tab with audio.'
-      : 'Use laptop speakers. Keep this page open and tap Listen. The spoken task will trigger steps, code and a test.'));
+      : 'Use laptop speakers. Keep this page open and tap Listen for code, a walkthrough, cross-questions and documentation links.'));
     return w;
   }
   w.appendChild(el('h1', '', 'Your live call copilot'));
