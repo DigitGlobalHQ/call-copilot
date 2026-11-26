@@ -593,12 +593,8 @@ function ingestFinal(conn, words) {
     if (libraryInterview() && !sess.demo && !tabMode() && mapFor(conn).me == null &&
         r.wt.map((word) => word.n).join(' ') === 'testing testing') {
       finishCheck(conn, r.spk);
-    } else if (sess.check && sess.check.conn === conn) {
-      const hits = r.words.filter((x) => /test/i.test(x)).length;
-      if (hits) {
-        sess.check.votes[r.spk] = (sess.check.votes[r.spk] || 0) + hits;
-        if (sess.check.votes[r.spk] >= 1) finishCheck(conn, r.spk);
-      }
+    } else if (sess.check && sess.check.conn === conn && /^(?:test(?:ing)?[.,!\s]*)+$/i.test(r.text.trim())) {
+      finishCheck(conn, r.spk);
     }
     const last = sess.turns[sess.turns.length - 1];
     if (last && last.conn === conn && last.spk === r.spk && r.start - last.end < 6) {
@@ -653,6 +649,7 @@ $('#liveHead').onclick = () => { $('#live').classList.toggle('expanded'); trSig 
 
 /* ---------- question detection ---------- */
 const wc = (s) => (s.trim().match(/\S+/g) || []).length;
+const soundsLikeRequest = (text) => /\?\s*$|(?:^|[.!?]\s+|\bplease\s+)(?:how|why|what|which|can you|could you|let.s|build|write|design|implement|explain|show|suppose|imagine|walk me through)\b|\b(?:your task is|we need|we want|the (?:library|function) (?:must|should)|(?:build|implement|write) (?:a|an) (?:small |reusable )?(?:library|function))\b/i.test(text.trim());
 let trigT = null;
 let trigDue = 0;
 function scheduleAnswer(ms) { clearTimeout(trigT); trigDue = Date.now() + ms; trigT = setTimeout(fireAnswer, ms); }
@@ -664,6 +661,12 @@ function fireAnswer() { if (!trigDue) return; trigDue = 0; clearTimeout(trigT); 
 function latestBlock() {
   const T = sess.turns;
   let i = T.length - 1;
+  const latest = T[i];
+  // Room diarization can label both voices as ME, particularly during solo practice.
+  if (libraryInterview() && !tabMode() && latest && latest.conn !== 'typed' &&
+      roleOf(latest.conn, latest.spk) === 'me' && soundsLikeRequest(latest.text)) {
+    return { blockId: 'b' + latest.id, text: latest.text };
+  }
   while (i >= 0 && (T[i].conn === 'typed' || roleOf(T[i].conn, T[i].spk) === 'me')) i--;
   if (i < 0) return null;
   const owner = T[i], ownerRole = roleOf(owner.conn, owner.spk);
@@ -696,16 +699,16 @@ function answerLine(t) {
   toast('Answering that line');
 }
 function maybeAnswer(force) {
-  if (sess.check && !force) return;
   if (nowBusy && !force) return;
   const b = latestBlock();
   if (!b) { if (force) toast('Nothing from them yet'); return; }
+  if (sess.check && !force && /^(?:test(?:ing)?[.,!\s]*)+$/i.test(b.text.trim())) return;
   // a block can hold several questions if ME stays quiet; each gets its own card
   const segs = sess.cards.filter((c) => c.blockId === b.blockId).sort((x, y) => (x.qStart || 0) - (y.qStart || 0));
   const card = segs[segs.length - 1];
   if (!card) {
-    if (!force && wc(b.text) < 3) return;
-    newCard(b.blockId, 0, b.text, !!force); return;
+    if (!force && wc(b.text) < 3 && !soundsLikeRequest(b.text)) return;
+    newCard(b.blockId, 0, b.text, force || libraryInterview()); return;
   }
   const base = b.text.slice(card.qStart || 0);
   const seg = base.trim();
@@ -715,12 +718,16 @@ function maybeAnswer(force) {
     const at = base.indexOf(card.q);
     const start = (card.qStart || 0) + (at >= 0 ? at : 0) + card.q.length;
     const rest = b.text.slice(start).trim();
-    if (!rest || (!force && wc(rest) < 3)) return;
-    newCard(b.blockId, start, rest, !!force); return;
+    if (!rest || (!force && wc(rest) < 3 && !soundsLikeRequest(rest))) return;
+    newCard(b.blockId, start, rest, force || libraryInterview()); return;
   }
   if (!force && !card.hidden && card.status !== 'noq' && wc(seg) - wc(card.q) < 3) return;
+  if (!force && ['wait', 'update', 'stream'].includes(card.status)) {
+    card.queuedQuestion = seg;
+    return;
+  }
   card.q = seg;
-  if (card.hidden) { card.hidden = false; card.pending = !force; }
+  if (card.hidden) { card.hidden = false; card.pending = !force && !libraryInterview(); }
   runCard(card); renderCards();
 }
 // ask Deepgram to finalise whatever is mid-sentence, wait briefly for it
@@ -776,9 +783,9 @@ function updateThinking() {
 function systemPrompt() {
   if (libraryInterview()) return `You assist a candidate during a live, spoken AWS infrastructure library exercise. The phone displays your response. ME is the candidate, THEM the interviewer, and ? an unidentified speaker. Infer who is assigning work from context.
 
-Treat a spoken assignment, example, acceptance criterion or change in requirements as a request, even when it has no question mark. As soon as the task is actionable, answer automatically. For greetings, filler, incomplete setup with no actionable task, or the candidate simply narrating their work, output only NOQ.
+Treat a spoken assignment, example, acceptance criterion or change in requirements as a request, even when it has no question mark. Answer technical questions regardless of speaker labels, including when a single person is rehearsing. If a technical request needs clarification, ask one concrete question. Use NOQ only for unrelated chatter, greetings or narration with no request.
 
-For a new build task, start the reply with the exact Markdown heading "## Logic flow". Put it before any code, file names or implementation steps. Return these sections in order:
+Whenever the interviewer has described a new problem with enough detail to outline a solution, start the answer automatically. A declarative problem statement alone is sufficient. Include the flow even if nobody asks for a flow, steps, code or an explanation. Start with the exact Markdown heading "## Logic flow", before code or file names. Return these sections in order:
 1. Logic flow: in one sentence state what the caller gives us and what they need back. Show 3–5 short, problem-specific actions joined by arrows, from input to output. Name the decision or state that matters and explain why in a sentence the candidate can say aloud. Trace one tiny example through that decision to its expected result. Mark assumptions and ask a clarification only if it changes the solution.
 2. Build steps: now turn the flow into three implementation steps: the public API, the AWS interaction, and a test for the important decision. Refer back to the flow without repeating it.
 3. Implementation: give the filename and a compact, runnable Python module in a fenced code block. Add a short numbered comment above each logical step. Use Boto3 and an injected client when appropriate. Use the interviewer's chosen language if different.
@@ -871,7 +878,10 @@ function userPrompt(card) {
   }
   if (card.typed) return `Live transcript so far (oldest first):\n${transcriptText()}${earlierSuggestions}\n\nME is asking you privately (THEM cannot see this): "${card.q}"\n\nAnswer ME directly and briefly. Do not reply NOQ.`;
   if (libraryInterview()) {
-    return `Transcript:\n${transcriptText()}${earlierSuggestions}\n\nNewest speech: ${card.q}\nApply the build, follow-up or discussion instructions to this speech.`;
+    const instruction = soundsLikeRequest(card.q) || card.requireAnswer
+      ? 'Answer this request directly. If a detail is missing ask one clarifying question. Never reply NOQ.'
+      : 'Apply the build, follow-up or discussion instructions to this speech.';
+    return `Transcript:\n${transcriptText()}${earlierSuggestions}\n\nNewest speech: ${card.q}\n${instruction}`;
   }
   return `Live transcript so far (oldest first):\n${transcriptText()}\n\nNewest from THEM: "${card.q}"\n\nWrite what ME should say now, or NOQ.`;
 }
@@ -892,35 +902,54 @@ async function streamClaude(card, onText) {
     try { const j = await res.json(); if (j && j.error && j.error.message) msg = j.error.message; } catch (e) {}
     const err = new Error(msg); err.status = res.status; throw err;
   }
+  if (res.headers.get('content-type')?.includes('application/json')) {
+    const reply = await res.json();
+    const text = (reply.content || []).filter((block) => block.type === 'text').map((block) => block.text).join('');
+    if (!text.trim()) throw new Error(reply.error?.message || 'The answer service returned no text. Tap Redo to retry.');
+    onText(text);
+    return text;
+  }
   const reader = res.body.getReader(), dec = new TextDecoder();
   let buf = '', text = '';
   for (;;) {
     const { value, done } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true });
+    buf += done ? dec.decode() + '\n' : dec.decode(value, { stream: true });
     let i;
-    while ((i = buf.indexOf('\n\n')) >= 0) {
-      const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
-      for (const line of chunk.split('\n')) {
-        if (!line.startsWith('data:')) continue;
-        const data = line.slice(5).trim(); if (!data) continue;
-        let ev; try { ev = JSON.parse(data); } catch (e) { continue; }
-        if (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta') { text += ev.delta.text; onText(text); }
-        else if (ev.type === 'error') throw new Error((ev.error && ev.error.message) || 'Stream error');
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, i).trimEnd(); buf = buf.slice(i + 1);
+      if (!line.startsWith('data:')) continue;
+      const data = line.slice(5).trim(); if (!data || data === '[DONE]') continue;
+      const ev = JSON.parse(data);
+      if (ev.type === 'content_block_start' && ev.content_block?.type === 'text' && ev.content_block.text) {
+        text += ev.content_block.text; onText(text);
+      } else if (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta') {
+        text += ev.delta.text; onText(text);
+      } else if (ev.type === 'error') {
+        throw new Error((ev.error && ev.error.message) || 'Stream error');
       }
     }
+    if (done) break;
   }
+  if (!text.trim()) throw new Error('The answer service returned no text. Tap Redo to try this transcript again.');
   return text;
 }
 
 async function runCard(card) {
   if (card.ctrl) { try { card.ctrl.abort(); } catch (e) {} }
   const gen = ++card.gen;
-  card.ctrl = new AbortController();
+  const controller = card.ctrl = new AbortController();
+  card.queuedQuestion = null;
+  let timedOut = false, timer;
+  function resetTimeout() {
+    clearTimeout(timer);
+    timer = setTimeout(() => { timedOut = true; controller.abort(); }, 60000);
+  }
+  resetTimeout();
   card.status = card.text ? 'update' : 'wait';
   card.t0 = performance.now(); card.updatedAt = Date.now();
   const onText = (t) => {
     if (gen !== card.gen) return;
+    resetTimeout();
     const trimmed = t.trim();
     if (!card.typed && !card.now && card.lineId == null && (/^N(O(Q)?)?$/.test(trimmed) || trimmed.startsWith('NOQ'))) return; // might be NOQ, hold
     card.text = t; card.status = 'stream';
@@ -931,7 +960,7 @@ async function runCard(card) {
   const showError = (msg) => {
     card.status = 'error'; card.err = msg;
     if (card.pending) { card.pending = false; renderCards(true); } else paintCard(card);
-    updateThinking();
+    updateThinking(); saveSoon();
   };
   paintCard(card); updateThinking();
   try {
@@ -947,7 +976,14 @@ async function runCard(card) {
       }
     }
     if (gen !== card.gen) return;
-    if (!card.typed && !card.now && card.lineId == null && full.trim().startsWith('NOQ')) {
+    if (!sess.demo && libraryInterview() && full.trim() === 'NOQ' && !card.queuedQuestion &&
+        (soundsLikeRequest(card.q) || /\b(?:AWS|S3|EC2|SQS|EBS|Boto3|Python|paginator|library|function|infrastructure)\b/i.test(card.q))) {
+      card.requireAnswer = true;
+      full = await streamClaude(card, onText);
+      if (gen !== card.gen) return;
+      if (full.trim() === 'NOQ') throw new Error('The answer service could not interpret this request. Tap Answer now to retry the latest transcript.');
+    }
+    if (!card.typed && !card.now && card.lineId == null && full.trim() === 'NOQ') {
       if (!card.text) { card.status = 'noq'; card.hidden = true; card.pending = false; renderCards(); updateThinking(); return; }
       // a longer version of the block turned out not to be a question: keep the earlier answer
       card.status = 'done';
@@ -956,10 +992,20 @@ async function runCard(card) {
     if (card.pending) { card.pending = false; renderCards(true); } else paintCard(card);
     updateThinking(); saveSoon();
   } catch (e) {
-    if (e.name === 'AbortError' || gen !== card.gen) return;
-    let msg = e.status === 401 ? 'Anthropic key rejected. Check it in Settings.' : (e.message || 'Could not reach Claude.');
+    if (gen !== card.gen || (controller.signal.aborted && !timedOut)) return;
+    let msg = timedOut ? 'The answer service stopped responding. Tap Redo to retry.' : e.status === 401 ? 'Anthropic key rejected. Check it in Settings.' : (e.message || 'Could not reach Claude.');
     if (/fetch|network|Load failed/i.test(msg)) msg = 'No connection to Claude. Check the internet on this phone.';
     showError(msg);
+  } finally {
+    clearTimeout(timer);
+    if (gen === card.gen && card.queuedQuestion && sess.cards.includes(card)) {
+      card.q = card.queuedQuestion; card.queuedQuestion = null;
+      if (card.status !== 'error' && !controller.signal.aborted) {
+        card.hidden = false; card.pending = !card.text && !libraryInterview();
+        runCard(card);
+      }
+      renderCards();
+    }
   }
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1131,6 +1177,12 @@ function onDG(conn, m) {
     let words = alt.words || [];
     const multi = Array.isArray(m.channel_index) && m.channel_index[1] > 1;
     const ch = multi ? m.channel_index[0] : null;
+    // Word timings are optional. The final transcript itself is enough to answer.
+    if (m.is_final && !words.length && alt.transcript && alt.transcript.trim()) {
+      const start = Number(m.start) || 0;
+      words = [{ word: alt.transcript.trim(), start, end: start + (Number(m.duration) || 0),
+        speaker: multi ? ch : sess.interim?.spk }];
+    }
     if (multi) words = words.map((w) => Object.assign({}, w, { speaker: ch }));
     const ib = sess.interimBy || (sess.interimBy = {});
     if (!m.is_final) {
@@ -1517,7 +1569,10 @@ function saveSoon() {
     store.set(sessionKey, {
       at: Date.now(), startedAt: sess.startedAt,
       turns: sess.turns.slice(-300).map((t) => ({ id: t.id, conn: t.conn, spk: t.spk, text: t.text, start: t.start, end: t.end, role: roleOf(t.conn, t.spk) })),
-      cards: visibleCards().slice(-40).map((c) => ({ id: c.id, blockId: c.blockId, qStart: c.qStart || 0, q: c.q, text: c.text, typed: !!c.typed }))
+      cards: visibleCards().slice(-40).map((c) => ({
+        id: c.id, blockId: c.blockId, qStart: c.qStart || 0, q: c.q, text: c.text, typed: !!c.typed,
+        err: c.status === 'error' ? c.err : c.status !== 'done' ? 'This answer was interrupted. Tap Redo to resume from the transcript.' : ''
+      }))
     });
   }, 800);
 }
@@ -1527,7 +1582,10 @@ function restore() {
   // earlier connections become fixed roles
   sess.maps.old = { me: 'me', src: 'restored' };
   sess.turns = (s.turns || []).map((t) => ({ id: t.id, conn: 'old', spk: t.role === 'me' ? 'me' : 'x', text: t.text, start: 0, end: 0 }));
-  sess.cards = (s.cards || []).map((c) => Object.assign({ status: 'done', gen: 0, qStart: 0, updatedAt: 0 }, c));
+  sess.cards = (s.cards || []).map((c) => {
+    const err = c.err || (!c.text?.trim() ? 'This answer was empty. Tap Redo to retry the saved transcript.' : '');
+    return { gen: 0, qStart: 0, updatedAt: 0, ...c, status: err ? 'error' : 'done', err };
+  });
   nextId = Math.max(1, ...sess.turns.map((t) => t.id + 1), ...sess.cards.map((c) => c.id + 1));
   sess.startedAt = s.startedAt || 0;
   if (sess.turns.length || sess.cards.length) toast('Restored your last session');
